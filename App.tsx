@@ -135,7 +135,7 @@ const App: React.FC = () => {
                   className={`flex items-center gap-3 px-6 py-3 rounded-2xl font-bold transition-all whitespace-nowrap ${activeTab === 'practice' ? 'bg-rose-50 text-rose-600 shadow-sm' : 'text-slate-500 hover:bg-slate-50'}`}
                 >
                   <ICONS.Chat />
-                  Live Roleplay
+                  Live Practice
                 </button>
                 <button 
                   onClick={() => setActiveTab('video')}
