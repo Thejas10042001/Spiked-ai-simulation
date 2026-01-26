@@ -118,7 +118,8 @@ export async function generatePitchAudio(text: string, voiceName: string = 'Kore
 }
 
 export async function analyzeSalesContext(filesContent: string): Promise<AnalysisResult> {
-  const modelName = 'gemini-3-pro-preview';
+  // Use Flash for better quota availability and speed
+  const modelName = 'gemini-3-flash-preview';
   const citationSchema = {
     type: Type.OBJECT,
     properties: {
@@ -198,6 +199,9 @@ export async function analyzeSalesContext(filesContent: string): Promise<Analysi
     });
     return JSON.parse(response.text || "{}") as AnalysisResult;
   } catch (error: any) {
+    if (error.message?.includes('429') || error.message?.includes('RESOURCE_EXHAUSTED')) {
+      throw new Error("Quota exceeded. The Gemini API Free Tier has limited requests. Please wait a minute and try again, or use a smaller document.");
+    }
     throw new Error(`Intelligence Analysis Failed: ${error.message}`);
   }
 }

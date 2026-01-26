@@ -82,7 +82,15 @@ const App: React.FC = () => {
               
               <div className="mt-10 flex flex-col items-center">
                 {error && (
-                  <p className="text-rose-500 text-sm mb-6 font-medium bg-rose-50 px-4 py-2 rounded-full border border-rose-100">⚠️ {error}</p>
+                  <div className="bg-rose-50 border border-rose-100 rounded-2xl p-6 mb-8 max-w-xl text-center">
+                    <p className="text-rose-600 font-bold mb-2">⚠️ Analysis Interrupted</p>
+                    <p className="text-rose-500 text-sm leading-relaxed">{error}</p>
+                    {error.includes("Quota") && (
+                      <p className="text-slate-400 text-[10px] mt-4 uppercase font-bold tracking-widest">
+                        Tip: Gemini Free Tier has strict rate limits. Try again in 60 seconds.
+                      </p>
+                    )}
+                  </div>
                 )}
                 <button
                   onClick={runAnalysis}
