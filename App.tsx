@@ -5,6 +5,7 @@ import { FileUpload } from './components/FileUpload';
 import { AnalysisView } from './components/AnalysisView';
 import { VideoGenerator } from './components/VideoGenerator';
 import { AudioGenerator } from './components/AudioGenerator';
+import { PracticeSession } from './components/PracticeSession';
 import { analyzeSalesContext } from './services/geminiService';
 import { AnalysisResult, UploadedFile } from './types';
 import { ICONS } from './constants';
@@ -15,7 +16,7 @@ const App: React.FC = () => {
   const [isAnalyzing, setIsAnalyzing] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [statusMessage, setStatusMessage] = useState("");
-  const [activeTab, setActiveTab] = useState<'strategy' | 'video' | 'audio'>('strategy');
+  const [activeTab, setActiveTab] = useState<'strategy' | 'video' | 'audio' | 'practice'>('strategy');
 
   const isAnyFileProcessing = useMemo(() => files.some(f => f.status === 'processing'), [files]);
   const readyFilesCount = useMemo(() => files.filter(f => f.status === 'ready').length, [files]);
@@ -130,6 +131,13 @@ const App: React.FC = () => {
                   Strategy Brief
                 </button>
                 <button 
+                  onClick={() => setActiveTab('practice')}
+                  className={`flex items-center gap-3 px-6 py-3 rounded-2xl font-bold transition-all whitespace-nowrap ${activeTab === 'practice' ? 'bg-rose-50 text-rose-600 shadow-sm' : 'text-slate-500 hover:bg-slate-50'}`}
+                >
+                  <ICONS.Chat />
+                  Live Roleplay
+                </button>
+                <button 
                   onClick={() => setActiveTab('video')}
                   className={`flex items-center gap-3 px-6 py-3 rounded-2xl font-bold transition-all whitespace-nowrap ${activeTab === 'video' ? 'bg-indigo-50 text-indigo-600 shadow-sm' : 'text-slate-500 hover:bg-slate-50'}`}
                 >
@@ -153,6 +161,7 @@ const App: React.FC = () => {
             </div>
 
             {activeTab === 'strategy' && <AnalysisView result={analysis!} files={files} />}
+            {activeTab === 'practice' && <PracticeSession analysis={analysis!} />}
             {activeTab === 'video' && <VideoGenerator analysis={analysis!} />}
             {activeTab === 'audio' && <AudioGenerator analysis={analysis!} />}
           </div>
