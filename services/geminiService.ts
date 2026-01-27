@@ -1,10 +1,11 @@
 
 import { GoogleGenAI, Type, Modality } from "@google/genai";
-import { AnalysisResult } from "../types";
+import { AnalysisResult, MeetingContext } from "../types";
 
 const ai = new GoogleGenAI({ apiKey: process.env.API_KEY });
 
 export async function performVisionOcr(base64Data: string, mimeType: string): Promise<string> {
+  // Use gemini-3-flash-preview for basic text extraction tasks
   const modelName = 'gemini-3-flash-preview';
   try {
     const response = await ai.models.generateContent({
@@ -20,6 +21,91 @@ export async function performVisionOcr(base64Data: string, mimeType: string): Pr
   } catch (error) {
     console.error("Vision OCR failed:", error);
     return "";
+  }
+}
+
+export interface CognitiveSearchResult {
+  answer: string;
+  citations: { snippet: string; source: string }[];
+  reasoningChain: {
+    painPoint: string;
+    capability: string;
+    strategicValue: string;
+  };
+}
+
+/**
+ * Performs complex reasoning to map client pain points to capabilities.
+ * Upgraded to gemini-3-pro-preview for advanced reasoning.
+ */
+export async function performCognitiveSearch(question: string, filesContent: string, context: MeetingContext): Promise<CognitiveSearchResult> {
+  const modelName = 'gemini-3-pro-preview';
+  
+  const prompt = `MEETING DETAILS:
+  Seller: ${context.sellerNames} at ${context.sellerCompany}
+  Client: ${context.clientNames} at ${context.clientCompany}
+  Focus: ${context.meetingFocus}
+  Strategic Keywords: ${context.strategicKeywords.join(', ')}
+  Snapshot: ${context.executiveSnapshot}
+
+  TASK: Perform COGNITIVE GROUNDING to answer the question using the source documents.
+  REASONING STYLE: Map Client Pain Point (from KYC/docs) -> SpikedAI Capability -> Strategic Value.
+
+  QUESTION: ${question}
+  
+  --- SOURCE DOCUMENTS ---
+  ${filesContent || "No documents uploaded yet."}
+  
+  Return your response ONLY as a JSON object with:
+  - "answer": A comprehensive response following the requested Answer Styles: ${context.answerStyles.join(', ')}.
+  - "citations": Array of { "snippet": string, "source": string }.
+  - "reasoningChain": { "painPoint": string, "capability": string, "strategicValue": string }`;
+
+  try {
+    const response = await ai.models.generateContent({
+      model: modelName,
+      contents: prompt,
+      config: {
+        systemInstruction: `ACT AS: Avi from Spiked. ${context.baseSystemPrompt}`,
+        responseMimeType: "application/json",
+        responseSchema: {
+          type: Type.OBJECT,
+          properties: {
+            answer: { type: Type.STRING },
+            citations: {
+              type: Type.ARRAY,
+              items: {
+                type: Type.OBJECT,
+                properties: {
+                  snippet: { type: Type.STRING },
+                  source: { type: Type.STRING }
+                },
+                required: ["snippet", "source"]
+              }
+            },
+            reasoningChain: {
+              type: Type.OBJECT,
+              properties: {
+                painPoint: { type: Type.STRING },
+                capability: { type: Type.STRING },
+                strategicValue: { type: Type.STRING }
+              },
+              required: ["painPoint", "capability", "strategicValue"]
+            }
+          },
+          required: ["answer", "citations", "reasoningChain"]
+        }
+      }
+    });
+    
+    let text = response.text || "{}";
+    const jsonMatch = text.match(/\{[\s\S]*\}/);
+    if (jsonMatch) text = jsonMatch[0];
+    
+    return JSON.parse(text);
+  } catch (error: any) {
+    console.error("Cognitive search failed:", error);
+    throw new Error("Could not retrieve a grounded answer. Ensure documents are uploaded.");
   }
 }
 
@@ -117,9 +203,12 @@ export async function generatePitchAudio(text: string, voiceName: string = 'Kore
   }
 }
 
-export async function analyzeSalesContext(filesContent: string): Promise<AnalysisResult> {
-  // Use Flash for better quota availability and speed
-  const modelName = 'gemini-3-flash-preview';
+/**
+ * Performs core analysis of sales context and documents.
+ * Upgraded to gemini-3-pro-preview for complex reasoning and synthesis.
+ */
+export async function analyzeSalesContext(filesContent: string, context: MeetingContext): Promise<AnalysisResult> {
+  const modelName = 'gemini-3-pro-preview';
   const citationSchema = {
     type: Type.OBJECT,
     properties: {
@@ -129,9 +218,13 @@ export async function analyzeSalesContext(filesContent: string): Promise<Analysi
     required: ["snippet", "sourceFile"],
   };
 
-  const systemInstruction = `You are a Cognitive AI Sales Intelligence Agent. Your goal is to provide deeply grounded strategic advice for sales professionals. 
-  When providing opening lines, ensure you offer 2-3 distinct options, each with a clear label describing its strategic intent (e.g., 'The Strategic Hook', 'The Direct Outcome approach', 'The Value-First approach'). 
-  Structure your entire response as a single valid JSON object adhering strictly to the provided schema.`;
+  const systemInstruction = `You are a Cognitive AI Sales Intelligence Agent. 
+  PERSONA: ${context.persona}
+  TARGET: ${context.clientNames} at ${context.clientCompany}
+  ${context.baseSystemPrompt}
+  
+  Structure your entire response as a single valid JSON object adhering strictly to the provided schema. 
+  Ensure all citations are derived from the source documents provided.`;
 
   const responseSchema = {
     type: Type.OBJECT,
@@ -167,7 +260,7 @@ export async function analyzeSalesContext(filesContent: string): Promise<Analysi
           type: Type.OBJECT, 
           properties: { 
             text: { type: Type.STRING }, 
-            label: { type: Type.STRING, description: "A concise label for the opener style (e.g., 'The Strategic Hook')" },
+            label: { type: Type.STRING },
             citation: citationSchema 
           }, 
           required: ["text", "label", "citation"] 
@@ -182,8 +275,9 @@ export async function analyzeSalesContext(filesContent: string): Promise<Analysi
     required: ["snapshot", "documentInsights", "openingLines", "predictedQuestions", "strategicQuestionsToAsk", "objectionHandling", "toneGuidance", "finalCoaching"]
   };
 
-  const prompt = `Analyze the following sales-related documents and provide a complete conversation strategy. 
-  Ensure you provide exactly 2 to 3 very distinct opening lines grounded in the source text. 
+  const prompt = `Analyze these documents for ${context.clientCompany}. 
+  Meeting Focus: ${context.meetingFocus}
+  Strategic Context: ${context.executiveSnapshot}
   --- DOCUMENTS --- ${filesContent} --- END DOCUMENTS ---`;
 
   try {
@@ -197,10 +291,15 @@ export async function analyzeSalesContext(filesContent: string): Promise<Analysi
         thinkingConfig: { thinkingBudget: 12000 }
       },
     });
-    return JSON.parse(response.text || "{}") as AnalysisResult;
+    
+    let text = response.text || "{}";
+    const jsonMatch = text.match(/\{[\s\S]*\}/);
+    if (jsonMatch) text = jsonMatch[0];
+    
+    return JSON.parse(text) as AnalysisResult;
   } catch (error: any) {
-    if (error.message?.includes('429') || error.message?.includes('RESOURCE_EXHAUSTED')) {
-      throw new Error("Quota exceeded. The Gemini API Free Tier has limited requests. Please wait a minute and try again, or use a smaller document.");
+    if (error.message?.includes('429')) {
+      throw new Error("Gemini API Rate Limit Reached. Please wait 60s.");
     }
     throw new Error(`Intelligence Analysis Failed: ${error.message}`);
   }

@@ -96,3 +96,20 @@ export interface UploadedFile {
   type: string;
   status: 'processing' | 'ready' | 'error' | 'ocr';
 }
+
+export type CustomerPersonaType = 'Balanced' | 'Technical' | 'Financial' | 'Business Executives';
+
+export interface MeetingContext {
+  sellerCompany: string;
+  sellerNames: string;
+  clientCompany: string;
+  clientNames: string;
+  targetProducts: string;
+  productDomain: string;
+  meetingFocus: string;
+  persona: CustomerPersonaType;
+  answerStyles: string[];
+  executiveSnapshot: string;
+  strategicKeywords: string[];
+  baseSystemPrompt: string;
+}

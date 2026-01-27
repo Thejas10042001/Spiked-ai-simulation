@@ -106,12 +106,17 @@ export const FileUpload: React.FC<FileUploadProps> = ({ onFilesChange, files }) 
     return result.value;
   };
 
+  /**
+   * Fixes property access errors on 'unknown' by explicitly typing fileList and the map parameters.
+   */
   const handleFileChange = async (e: React.ChangeEvent<HTMLInputElement>) => {
     if (!e.target.files) return;
 
-    const fileList = Array.from(e.target.files);
+    // Explicitly type fileList as File[] to resolve 'unknown' errors
+    const fileList: File[] = Array.from(e.target.files);
     
-    const placeholders: UploadedFile[] = fileList.map(f => ({
+    // Type the map parameter f as File
+    const placeholders: UploadedFile[] = fileList.map((f: File) => ({
       name: f.name,
       content: '',
       type: f.type,
@@ -124,6 +129,7 @@ export const FileUpload: React.FC<FileUploadProps> = ({ onFilesChange, files }) 
     let currentFilesState = [...initialFiles];
     
     for (let i = 0; i < fileList.length; i++) {
+      // file is correctly inferred as File here
       const file = fileList[i];
       try {
         let text = "";
