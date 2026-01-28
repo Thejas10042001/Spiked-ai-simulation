@@ -1,4 +1,3 @@
-
 import React, { useState, useEffect, useMemo } from 'react';
 import { AnalysisResult } from '../types';
 import { ICONS } from '../constants';
@@ -234,7 +233,7 @@ export const VideoGenerator: React.FC<VideoGeneratorProps> = ({ analysis }) => {
                 <p className="text-xs text-slate-500 font-bold uppercase tracking-widest">Neural Render Complete</p>
               </div>
               <div className="h-4 w-px bg-slate-200"></div>
-              <p className="text-[10px] text-slate-400 italic">Inspired by {analysis.snapshot.priorities[0].text}</p>
+              <p className="text-[10px] text-slate-400 italic">Inspired by {(analysis.snapshot.priorities || [])[0]?.text || "strategic analysis"}</p>
             </div>
             <div className="flex gap-4">
               <button 

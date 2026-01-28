@@ -5,12 +5,340 @@ import { AnalysisResult, MeetingContext } from "../types";
 const ai = new GoogleGenAI({ apiKey: process.env.API_KEY });
 
 /**
- * High-speed analysis for real-time sales strategy.
+ * Advanced Semantic OCR using Gemini 3 Pro.
+ * Handles messy scans, handwriting, and complex layouts.
  */
-export async function analyzeSalesContext(filesContent: string, context: MeetingContext): Promise<AnalysisResult> {
-  // Use gemini-3-flash-preview for maximum speed and sub-second latency
-  const modelName = 'gemini-3-flash-preview';
+export async function performVisionOcr(base64Data: string, mimeType: string): Promise<string> {
+  const modelName = 'gemini-3-pro-preview'; 
+  try {
+    const response = await ai.models.generateContent({
+      model: modelName,
+      contents: {
+        parts: [
+          { inlineData: { data: base64Data, mimeType: mimeType } },
+          { 
+            text: `Act as a high-precision Cognitive OCR engine. 
+            TRANSCRIPTION TASK:
+            1. Extract ALL text from this image exactly as written.
+            2. Maintain structural layout where possible (headings, bullet points).
+            3. If tables are present, reconstruct them using Markdown format.
+            4. If there is handwriting, use your reasoning to transcribe it accurately.
+            5. If text is blurry, provide your best grounded inference.
+            6. Output ONLY the extracted text. Do not provide commentary.` 
+          },
+        ],
+      },
+    });
+    return response.text || "";
+  } catch (error) {
+    console.error("Vision OCR failed:", error);
+    return "";
+  }
+}
+
+export interface CognitiveSearchResult {
+  answer: string;
+  briefExplanation: string;
+  citations: { snippet: string; source: string }[];
+  reasoningChain: {
+    painPoint: string;
+    capability: string;
+    strategicValue: string;
+  };
+}
+
+export async function performCognitiveSearch(question: string, filesContent: string, context: MeetingContext): Promise<CognitiveSearchResult> {
+  const modelName = 'gemini-3-pro-preview';
   
+  // Enforce the requested styles in the prompt
+  const requestedStyles = context.answerStyles.length > 0 
+    ? `The user has specifically requested the following response components: ${context.answerStyles.join(', ')}.`
+    : "Follow standard strategic consulting format.";
+
+  const prompt = `MEETING DETAILS:
+  Seller: ${context.sellerNames} at ${context.sellerCompany}
+  Client: ${context.clientNames} at ${context.clientCompany}
+  Focus: ${context.meetingFocus}
+  Strategic Keywords: ${context.strategicKeywords.join(', ')}
+  Snapshot: ${context.executiveSnapshot}
+
+  TASK: Perform HIGH-FIDELITY COGNITIVE GROUNDING to answer the question using the source documents.
+  
+  ${requestedStyles}
+
+  FORMATTING RULES FOR THE "answer" STRING (CRITICAL):
+  You must partition your answer into the following specific blocks. Be BRIEF but DEEP.
+  
+  1. **CONCISE EXECUTIVE SUMMARY**
+     [A high-impact, 2-3 sentence cognitive punch explaining the direct answer.]
+
+  2. **DEEP STRATEGIC ANALYSIS**
+     [Go beneath the surface. Analyze the buyer's UNSTATED MOTIVATIONS, hidden risks in the document structure, and the semantic patterns that suggest deal velocity or friction.]
+
+  3. **SALES STRATEGY POINTS**
+     [Tactical, actionable bullet points for the salesperson to use in the meeting.]
+
+  4. If "Define Technical Terms" is active, use:
+     **TECHNICAL GLOSSARY**
+     [Plain-English definitions for complex jargon found in the docs.]
+
+  5. If "Competitive Comparison" is active, use:
+     **COMPETITIVE LANDSCAPE**
+     [Explain our specific wedge against competitors based on document evidence.]
+
+  6. If "Anticipated Customer Questions" is active, use:
+     **ANTICIPATED FRICTION**
+     [Prepare for the hard questions. Predict 2-3 objections based on document gaps.]
+
+  STYLE RULES:
+  - BOLD (**) critical keywords, revenue impacts, and names.
+  - ITALICIZE (*) nuanced observations and psychological inferences.
+  - Use high-density professional language.
+
+  QUESTION: ${question}
+  
+  --- SOURCE DOCUMENTS ---
+  ${filesContent || "No documents uploaded yet."}
+  
+  Return your response ONLY as a JSON object with:
+  - "answer": A comprehensive, beautifully formatted response using the specific section blocks requested.
+  - "briefExplanation": A single sentence executive summary (TL;DR).
+  - "citations": Array of { "snippet": string, "source": string }.
+  - "reasoningChain": { "painPoint": string, "capability": string, "strategicValue": string }`;
+
+  try {
+    const response = await ai.models.generateContent({
+      model: modelName,
+      contents: prompt,
+      config: {
+        systemInstruction: `ACT AS: Avi from Spiked (Sales Strategy Expert). Target Persona: ${context.persona}. You are known for being concise yet providing extreme strategic depth.`,
+        responseMimeType: "application/json",
+        responseSchema: {
+          type: Type.OBJECT,
+          properties: {
+            answer: { type: Type.STRING },
+            briefExplanation: { type: Type.STRING },
+            citations: {
+              type: Type.ARRAY,
+              items: {
+                type: Type.OBJECT,
+                properties: {
+                  snippet: { type: Type.STRING },
+                  source: { type: Type.STRING }
+                },
+                required: ["snippet", "source"]
+              }
+            },
+            reasoningChain: {
+              type: Type.OBJECT,
+              properties: {
+                painPoint: { type: Type.STRING },
+                capability: { type: Type.STRING },
+                strategicValue: { type: Type.STRING }
+              },
+              required: ["painPoint", "capability", "strategicValue"]
+            }
+          },
+          required: ["answer", "briefExplanation", "citations", "reasoningChain"]
+        }
+      }
+    });
+    
+    let text = response.text || "{}";
+    const jsonMatch = text.match(/\{[\s\S]*\}/);
+    if (jsonMatch) text = jsonMatch[0];
+    
+    return JSON.parse(text);
+  } catch (error: any) {
+    console.error("Cognitive search failed:", error);
+    throw new Error("Could not retrieve a grounded answer.");
+  }
+}
+
+export async function generateDynamicSuggestions(filesContent: string, context: MeetingContext): Promise<string[]> {
+  const modelName = 'gemini-3-flash-preview';
+  const prompt = `Based on the following meeting context and source documents, suggest 3 highly strategic and nuanced questions that a salesperson should ask our AI to uncover value mapping or deal friction.
+  
+  CONTEXT:
+  Client: ${context.clientCompany}
+  Persona: ${context.persona}
+  Focus: ${context.meetingFocus}
+  
+  --- DOCUMENTS ---
+  ${filesContent.slice(0, 5000)} ... [truncated]
+  
+  Return ONLY a JSON array of 3 strings.`;
+
+  try {
+    const response = await ai.models.generateContent({
+      model: modelName,
+      contents: prompt,
+      config: {
+        responseMimeType: "application/json",
+        responseSchema: {
+          type: Type.ARRAY,
+          items: { type: Type.STRING }
+        }
+      }
+    });
+    return JSON.parse(response.text || "[]");
+  } catch (error) {
+    return [
+      `What is the ROI for ${context.clientCompany}?`,
+      `How do we address ${context.persona} concerns?`,
+      `What are the top 3 value drivers?`
+    ];
+  }
+}
+
+export interface VideoStoryboard {
+  id: string;
+  title: string;
+  angle: string;
+  description: string;
+  veoPrompt: string;
+}
+
+export async function generateVideoStoryboard(analysis: AnalysisResult): Promise<VideoStoryboard[]> {
+  const prompt = `Based on this sales analysis of a ${analysis.snapshot.role}, generate 3 distinct cinematic video concepts for a sales explainer.
+  
+  CONTEXT:
+  Priorities: ${(analysis.snapshot.priorities || []).map(p => p.text).join(', ')}
+  Tone: ${analysis.snapshot.tone}
+  
+  Return a JSON array of 3 objects with:
+  - "id": string (unique)
+  - "title": string (engaging title)
+  - "angle": string (one word, e.g. "Emotional", "Logical", "Urgent")
+  - "description": string (short description)
+  - "veoPrompt": string (detailed visual prompt for a video generation model like Veo)`;
+
+  try {
+    const response = await ai.models.generateContent({
+      model: 'gemini-3-flash-preview',
+      contents: prompt,
+      config: {
+        responseMimeType: "application/json",
+        responseSchema: {
+          type: Type.ARRAY,
+          items: {
+            type: Type.OBJECT,
+            properties: {
+              id: { type: Type.STRING },
+              title: { type: Type.STRING },
+              angle: { type: Type.STRING },
+              description: { type: Type.STRING },
+              veoPrompt: { type: Type.STRING }
+            },
+            required: ["id", "title", "angle", "description", "veoPrompt"]
+          }
+        }
+      }
+    });
+    return JSON.parse(response.text || "[]");
+  } catch (e) {
+    return [
+      { id: '1', title: 'The Efficiency Engine', angle: 'Logical', description: 'A sleek data-driven visualization of ROI.', veoPrompt: 'Cinematic abstract data visualization showing growth' },
+      { id: '2', title: 'Risk Guard', angle: 'Protective', description: 'Visualizing security and stability.', veoPrompt: 'A shield made of glowing digital locks in a modern data center' },
+      { id: '3', title: 'The Visionary Leap', angle: 'Emotional', description: 'Focusing on transformation and the future.', veoPrompt: 'A person jumping between glowing platforms in a sunrise city' }
+    ];
+  }
+}
+
+export async function startVideoGeneration(prompt: string, aspectRatio: '16:9' | '9:16') {
+  const dynamicAi = new GoogleGenAI({ apiKey: process.env.API_KEY });
+  return await dynamicAi.models.generateVideos({
+    model: 'veo-3.1-fast-generate-preview',
+    prompt: prompt,
+    config: {
+      numberOfVideos: 1,
+      resolution: '720p',
+      aspectRatio: aspectRatio
+    }
+  });
+}
+
+export async function getVideoStatus(operationId: any) {
+  const dynamicAi = new GoogleGenAI({ apiKey: process.env.API_KEY });
+  return await dynamicAi.operations.getVideosOperation({ operation: operationId });
+}
+
+export function decode(base64: string) {
+  const binaryString = atob(base64);
+  const len = binaryString.length;
+  const bytes = new Uint8Array(len);
+  for (let i = 0; i < len; i++) {
+    bytes[i] = binaryString.charCodeAt(i);
+  }
+  return bytes;
+}
+
+export async function decodeAudioData(
+  data: Uint8Array,
+  ctx: AudioContext,
+  sampleRate: number,
+  numChannels: number,
+): Promise<AudioBuffer> {
+  const dataInt16 = new Int16Array(data.buffer);
+  const frameCount = dataInt16.length / numChannels;
+  const buffer = ctx.createBuffer(numChannels, frameCount, sampleRate);
+
+  for (let channel = 0; channel < numChannels; channel++) {
+    const channelData = buffer.getChannelData(channel);
+    for (let i = 0; i < frameCount; i++) {
+      channelData[i] = dataInt16[i * numChannels + channel] / 32768.0;
+    }
+  }
+  return buffer;
+}
+
+export async function generateExplanation(question: string, context: AnalysisResult): Promise<string> {
+  const prompt = `Based on the following sales analysis:
+  ${JSON.stringify(context, null, 2)}
+  
+  Please answer this salesperson's question about the strategy: "${question}"
+  Provide a concise, professional, and coaching-oriented explanation. Speak as a senior sales mentor.`;
+
+  try {
+    const response = await ai.models.generateContent({
+      model: 'gemini-3-flash-preview',
+      contents: prompt,
+      config: {
+        systemInstruction: "You are a senior sales consultant providing verbal coaching."
+      }
+    });
+    return response.text || "I'm sorry, I couldn't formulate an explanation for that.";
+  } catch (error) {
+    return "I encountered an error while trying to analyze that specific question.";
+  }
+}
+
+export async function generatePitchAudio(text: string, voiceName: string = 'Kore'): Promise<Uint8Array | null> {
+  const dynamicAi = new GoogleGenAI({ apiKey: process.env.API_KEY });
+  try {
+    const response = await dynamicAi.models.generateContent({
+      model: "gemini-2.5-flash-preview-tts",
+      contents: [{ parts: [{ text: text }] }],
+      config: {
+        responseModalities: [Modality.AUDIO],
+        speechConfig: {
+          voiceConfig: {
+            prebuiltVoiceConfig: { voiceName: voiceName },
+          },
+        },
+      },
+    });
+
+    const base64Audio = response.candidates?.[0]?.content?.parts?.[0]?.inlineData?.data;
+    if (!base64Audio) return null;
+    return decode(base64Audio);
+  } catch (error) {
+    return null;
+  }
+}
+
+export async function analyzeSalesContext(filesContent: string, context: MeetingContext): Promise<AnalysisResult> {
+  const modelName = 'gemini-3-pro-preview';
   const citationSchema = {
     type: Type.OBJECT,
     properties: {
@@ -20,6 +348,9 @@ export async function analyzeSalesContext(filesContent: string, context: Meeting
     required: ["snippet", "sourceFile"],
   };
 
+  const systemInstruction = `You are a Cognitive AI Sales Intelligence Agent. 
+  Structure your response as JSON. Ensure all citations are grounded in the provided documents.`;
+
   const responseSchema = {
     type: Type.OBJECT,
     properties: {
@@ -28,18 +359,15 @@ export async function analyzeSalesContext(filesContent: string, context: Meeting
         properties: {
           role: { type: Type.STRING },
           roleCitation: citationSchema,
-          roleConfidence: { type: Type.NUMBER },
           priorities: { type: Type.ARRAY, items: { type: Type.OBJECT, properties: { text: { type: Type.STRING }, citation: citationSchema }, required: ["text", "citation"] } },
           likelyObjections: { type: Type.ARRAY, items: { type: Type.OBJECT, properties: { text: { type: Type.STRING }, citation: citationSchema }, required: ["text", "citation"] } },
           decisionStyle: { type: Type.STRING },
           decisionStyleCitation: citationSchema,
-          decisionStyleConfidence: { type: Type.NUMBER },
           riskTolerance: { type: Type.STRING },
           riskToleranceCitation: citationSchema,
-          riskToleranceConfidence: { type: Type.NUMBER },
           tone: { type: Type.STRING },
         },
-        required: ["role", "roleCitation", "roleConfidence", "priorities", "likelyObjections", "decisionStyle", "decisionStyleCitation", "decisionStyleConfidence", "riskTolerance", "riskToleranceCitation", "riskToleranceConfidence", "tone"],
+        required: ["role", "roleCitation", "priorities", "likelyObjections", "decisionStyle", "decisionStyleCitation", "riskTolerance", "riskToleranceCitation", "tone"],
       },
       documentInsights: {
         type: Type.OBJECT,
@@ -79,26 +407,17 @@ export async function analyzeSalesContext(filesContent: string, context: Meeting
     required: ["snapshot", "documentInsights", "openingLines", "predictedQuestions", "strategicQuestionsToAsk", "objectionHandling", "toneGuidance", "finalCoaching"]
   };
 
-  const prompt = `ACT AS: Cognitive AI Sales Intelligence Agent.
-  
-  CONTEXT:
-  Target Client: ${context.clientCompany}
-  Meeting Goal: ${context.meetingFocus}
-  Product: ${context.targetProducts}
-
-  --- SOURCE DOCUMENTS ---
-  ${filesContent}
-  
-  Return analysis as JSON. Ground every strategic point in documentary evidence.`;
+  const prompt = `Analyze: ${context.clientCompany}. Focus: ${context.meetingFocus}. --- DOCUMENTS --- ${filesContent}`;
 
   try {
     const response = await ai.models.generateContent({
       model: modelName,
       contents: prompt,
       config: {
-        systemInstruction: `You are a world-class sales analyst. Ground everything in documentary proof. Be extremely precise and concise.`,
+        systemInstruction: `PERSONA: ${context.persona}. ${context.baseSystemPrompt}`,
         responseMimeType: "application/json",
         responseSchema,
+        thinkingConfig: { thinkingBudget: 12000 }
       },
     });
     
@@ -108,218 +427,6 @@ export async function analyzeSalesContext(filesContent: string, context: Meeting
     
     return JSON.parse(text) as AnalysisResult;
   } catch (error: any) {
-    throw new Error(`Analysis Failed: ${error.message}`);
-  }
-}
-
-export async function performVisionOcr(base64Data: string, mimeType: string): Promise<string> {
-  const modelName = 'gemini-3-flash-preview'; 
-  try {
-    const response = await ai.models.generateContent({
-      model: modelName,
-      contents: {
-        parts: [
-          { inlineData: { data: base64Data, mimeType: mimeType } },
-          { text: `High-fidelity OCR extraction. Layout preserving.` },
-        ],
-      },
-    });
-    return response.text || "";
-  } catch (error) {
-    console.error("Vision OCR failed:", error);
-    return "";
-  }
-}
-
-export interface CognitiveSearchResult {
-  answer: string;
-  briefExplanation: string;
-  citations: { snippet: string; source: string }[];
-  reasoningChain: {
-    painPoint: string;
-    capability: string;
-    strategicValue: string;
-  };
-}
-
-export async function performCognitiveSearch(question: string, filesContent: string, context: MeetingContext): Promise<CognitiveSearchResult> {
-  const modelName = 'gemini-3-flash-preview';
-  
-  const prompt = `QUESTION: ${question}
-  CLIENT: ${context.clientCompany}
-  --- SOURCE DOCUMENTS ---
-  ${filesContent}
-  
-  Analyze and provide a strategic sales-focused answer grounded in the documents. 
-  ALWAYS include a 'briefExplanation' which is a 2-sentence executive summary of the core tactical answer.`;
-
-  try {
-    const response = await ai.models.generateContent({
-      model: modelName,
-      contents: prompt,
-      config: {
-        systemInstruction: `You are a Cognitive AI Sales Intelligence Agent. Focus on logical justification. Ground everything in documents.`,
-        responseMimeType: "application/json",
-        responseSchema: {
-          type: Type.OBJECT,
-          properties: {
-            answer: { type: Type.STRING },
-            briefExplanation: { type: Type.STRING, description: "A high-density 2-sentence executive summary of the tactical answer." },
-            citations: {
-              type: Type.ARRAY,
-              items: {
-                type: Type.OBJECT,
-                properties: {
-                  snippet: { type: Type.STRING },
-                  source: { type: Type.STRING }
-                },
-                required: ["snippet", "source"]
-              }
-            },
-            reasoningChain: {
-              type: Type.OBJECT,
-              properties: {
-                painPoint: { type: Type.STRING },
-                capability: { type: Type.STRING },
-                strategicValue: { type: Type.STRING }
-              },
-              required: ["painPoint", "capability", "strategicValue"]
-            }
-          },
-          required: ["answer", "briefExplanation", "citations", "reasoningChain"]
-        }
-      }
-    });
-    
-    let text = response.text || "{}";
-    const jsonMatch = text.match(/\{[\s\S]*\}/);
-    if (jsonMatch) text = jsonMatch[0];
-    return JSON.parse(text);
-  } catch (error: any) {
-    throw new Error("Cognitive search failed.");
-  }
-}
-
-export async function generateDynamicSuggestions(filesContent: string, context: MeetingContext): Promise<string[]> {
-  const modelName = 'gemini-3-flash-preview';
-  const prompt = `Suggest 3 strategic sales questions for ${context.clientCompany} based on provided documentation.`;
-  try {
-    const response = await ai.models.generateContent({
-      model: modelName,
-      contents: prompt,
-      config: {
-        responseMimeType: "application/json",
-        responseSchema: { type: Type.ARRAY, items: { type: Type.STRING } }
-      }
-    });
-    return JSON.parse(response.text || "[]");
-  } catch (error) {
-    return ["What is the primary technical hurdle?", "How does this align with growth?", "What is the timeline?"];
-  }
-}
-
-export interface VideoStoryboard {
-  id: string;
-  title: string;
-  angle: string;
-  description: string;
-  veoPrompt: string;
-}
-
-export async function generateVideoStoryboard(analysis: AnalysisResult): Promise<VideoStoryboard[]> {
-  const modelName = 'gemini-3-flash-preview';
-  const prompt = `Create 3 video concepts for: ${analysis.snapshot.role}. Tone: ${analysis.snapshot.tone}.`;
-  try {
-    const response = await ai.models.generateContent({
-      model: modelName,
-      contents: prompt,
-      config: {
-        responseMimeType: "application/json",
-        responseSchema: {
-          type: Type.ARRAY,
-          items: {
-            type: Type.OBJECT,
-            properties: {
-              id: { type: Type.STRING },
-              title: { type: Type.STRING },
-              angle: { type: Type.STRING },
-              description: { type: Type.STRING },
-              veoPrompt: { type: Type.STRING }
-            },
-            required: ["id", "title", "angle", "description", "veoPrompt"]
-          }
-        }
-      }
-    });
-    return JSON.parse(response.text || "[]");
-  } catch (error) {
-    return [];
-  }
-}
-
-export async function startVideoGeneration(prompt: string, aspectRatio: '16:9' | '9:16') {
-  const dynamicAi = new GoogleGenAI({ apiKey: process.env.API_KEY });
-  return await dynamicAi.models.generateVideos({
-    model: 'veo-3.1-fast-generate-preview',
-    prompt: prompt,
-    config: {
-      numberOfVideos: 1,
-      resolution: '720p',
-      aspectRatio: aspectRatio
-    }
-  });
-}
-
-export async function getVideoStatus(operationId: any) {
-  const dynamicAi = new GoogleGenAI({ apiKey: process.env.API_KEY });
-  return await dynamicAi.operations.getVideosOperation({ operation: operationId });
-}
-
-export function decode(base64: string) {
-  const binaryString = atob(base64);
-  const bytes = new Uint8Array(binaryString.length);
-  for (let i = 0; i < binaryString.length; i++) bytes[i] = binaryString.charCodeAt(i);
-  return bytes;
-}
-
-export async function decodeAudioData(data: Uint8Array, ctx: AudioContext, sampleRate: number, numChannels: number): Promise<AudioBuffer> {
-  const dataInt16 = new Int16Array(data.buffer);
-  const frameCount = dataInt16.length / numChannels;
-  const buffer = ctx.createBuffer(numChannels, frameCount, sampleRate);
-  for (let channel = 0; channel < numChannels; channel++) {
-    const channelData = buffer.getChannelData(channel);
-    for (let i = 0; i < frameCount; i++) channelData[i] = dataInt16[i * numChannels + channel] / 32768.0;
-  }
-  return buffer;
-}
-
-export async function generateExplanation(question: string, context: AnalysisResult): Promise<string> {
-  try {
-    const response = await ai.models.generateContent({
-      model: 'gemini-3-flash-preview',
-      contents: `Based on analysis: ${JSON.stringify(context, null, 2)}\nAnswer: "${question}"`,
-    });
-    return response.text || "";
-  } catch (error) {
-    return "";
-  }
-}
-
-export async function generatePitchAudio(text: string, voiceName: string = 'Kore'): Promise<Uint8Array | null> {
-  const dynamicAi = new GoogleGenAI({ apiKey: process.env.API_KEY });
-  try {
-    const response = await dynamicAi.models.generateContent({
-      model: "gemini-2.5-flash-preview-tts",
-      contents: [{ parts: [{ text: text }] }],
-      config: {
-        responseModalities: [Modality.AUDIO],
-        speechConfig: { voiceConfig: { prebuiltVoiceConfig: { voiceName: voiceName } } },
-      },
-    });
-    const base64Audio = response.candidates?.[0]?.content?.parts?.[0]?.inlineData?.data;
-    if (!base64Audio) return null;
-    return decode(base64Audio);
-  } catch (error) {
-    return null;
+    throw new Error(`Intelligence Analysis Failed: ${error.message}`);
   }
 }

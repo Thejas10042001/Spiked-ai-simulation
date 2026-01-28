@@ -4,7 +4,6 @@ import { ICONS } from '../constants';
 import { performCognitiveSearch, generateDynamicSuggestions, CognitiveSearchResult } from '../services/geminiService';
 import { UploadedFile, MeetingContext } from '../types';
 
-// Define the missing CognitiveSearchProps interface
 interface CognitiveSearchProps {
   files: UploadedFile[];
   context: MeetingContext;
@@ -25,8 +24,87 @@ const FormattedText: React.FC<{ text: string }> = ({ text }) => {
         const formatted = content.split(/(\*\*.*?\*\*|\*.*?\*)/g).map((part, i) => {
           if (part.startsWith('**') && part.endsWith('**')) {
             const inner = part.slice(2, -2);
-            const isAllUpper = inner === inner.toUpperCase() && inner.length > 3;
             
+            // Strategic Block Mapping
+            if (inner === "CONCISE EXECUTIVE SUMMARY") {
+              return (
+                <div key={i} className="block mt-12 mb-6 bg-slate-100 border-l-8 border-slate-900 p-8 rounded-r-[2rem] shadow-lg animate-in slide-in-from-left-4">
+                  <div className="flex items-center gap-4 mb-2">
+                    <div className="text-slate-900"><ICONS.Efficiency /></div>
+                    <span className="text-slate-900 text-[12px] font-black uppercase tracking-[0.4em]">
+                      {inner}
+                    </span>
+                  </div>
+                </div>
+              );
+            }
+
+            if (inner === "DEEP STRATEGIC ANALYSIS") {
+              return (
+                <div key={i} className="block mt-12 mb-6 bg-gradient-to-r from-indigo-900 to-indigo-800 border-l-8 border-indigo-500 p-8 rounded-r-[2rem] shadow-2xl animate-in slide-in-from-left-4">
+                  <div className="flex items-center gap-4 mb-3">
+                    <div className="text-indigo-400"><ICONS.Brain /></div>
+                    <span className="text-indigo-100 text-[12px] font-black uppercase tracking-[0.4em]">
+                      {inner}
+                    </span>
+                  </div>
+                </div>
+              );
+            }
+
+            if (inner === "SALES STRATEGY POINTS") {
+              return (
+                <div key={i} className="block mt-12 mb-6 bg-emerald-50 border-l-8 border-emerald-500 p-8 rounded-r-[2rem] shadow-lg animate-in slide-in-from-left-4">
+                  <div className="flex items-center gap-4 mb-2">
+                    <div className="text-emerald-600"><ICONS.ROI /></div>
+                    <span className="text-emerald-600 text-[12px] font-black uppercase tracking-[0.4em]">
+                      {inner}
+                    </span>
+                  </div>
+                </div>
+              );
+            }
+
+            if (inner === "TECHNICAL GLOSSARY") {
+              return (
+                <div key={i} className="block mt-12 mb-6 bg-slate-900 border-l-8 border-indigo-400 p-8 rounded-r-[2rem] shadow-xl animate-in slide-in-from-left-4">
+                  <div className="flex items-center gap-4 mb-2">
+                    <div className="text-indigo-400"><ICONS.Brain /></div>
+                    <span className="text-indigo-200 text-[12px] font-black uppercase tracking-[0.4em]">
+                      {inner}
+                    </span>
+                  </div>
+                </div>
+              );
+            }
+
+            if (inner === "COMPETITIVE LANDSCAPE") {
+              return (
+                <div key={i} className="block mt-12 mb-6 bg-indigo-50 border-l-8 border-indigo-500 p-8 rounded-r-[2rem] shadow-lg animate-in slide-in-from-left-4">
+                  <div className="flex items-center gap-4 mb-2">
+                    <div className="text-indigo-600"><ICONS.Efficiency /></div>
+                    <span className="text-indigo-600 text-[12px] font-black uppercase tracking-[0.4em]">
+                      {inner}
+                    </span>
+                  </div>
+                </div>
+              );
+            }
+
+            if (inner === "ANTICIPATED FRICTION") {
+              return (
+                <div key={i} className="block mt-12 mb-6 bg-rose-50 border-l-8 border-rose-500 p-8 rounded-r-[2rem] shadow-lg animate-in slide-in-from-left-4">
+                  <div className="flex items-center gap-4 mb-2">
+                    <div className="text-rose-600"><ICONS.Shield /></div>
+                    <span className="text-rose-600 text-[12px] font-black uppercase tracking-[0.4em]">
+                      {inner}
+                    </span>
+                  </div>
+                </div>
+              );
+            }
+
+            const isAllUpper = inner === inner.toUpperCase() && inner.length > 3;
             if (isAllUpper) {
               return (
                 <div key={i} className="block mt-12 mb-6 first:mt-0">
@@ -41,7 +119,7 @@ const FormattedText: React.FC<{ text: string }> = ({ text }) => {
             }
             
             return (
-              <strong key={i} className="font-extrabold text-slate-900 bg-indigo-50/50 px-1 rounded">
+              <strong key={i} className="font-extrabold text-slate-900 bg-indigo-50/50 px-1.5 rounded-sm border-b-2 border-indigo-200">
                 {inner}
               </strong>
             );
@@ -57,8 +135,8 @@ const FormattedText: React.FC<{ text: string }> = ({ text }) => {
         });
 
         return (
-          <div key={idx} className={isBullet ? "flex gap-5 pl-8 border-l-2 border-indigo-100/50 py-2" : "py-1.5"}>
-            {isBullet && <span className="text-indigo-400 mt-2 font-black text-xs">●</span>}
+          <div key={idx} className={isBullet ? "flex gap-5 pl-8 border-l-4 border-indigo-100/50 py-3 mb-2 bg-white/40 rounded-r-xl" : "py-2"}>
+            {isBullet && <div className="mt-2.5 w-2 h-2 rounded-full bg-indigo-500 shadow-[0_0_10px_rgba(79,70,229,0.3)]"></div>}
             <div className={isBullet ? "flex-1" : ""}>{formatted}</div>
           </div>
         );
@@ -207,7 +285,7 @@ export const CognitiveSearch: React.FC<CognitiveSearchProps> = ({ files, context
                 </button>
               </div>
 
-              {/* NEW: BRIEF EXPLANATION CALLOUT */}
+              {/* BRIEF EXPLANATION CALLOUT */}
               <div className="bg-slate-900 rounded-[2.5rem] p-10 shadow-2xl relative overflow-hidden border border-slate-800 animate-in slide-in-from-top-4 duration-1000">
                 <div className="absolute top-0 right-0 p-6 opacity-20">
                   <ICONS.Play className="w-20 h-20 text-indigo-400" />

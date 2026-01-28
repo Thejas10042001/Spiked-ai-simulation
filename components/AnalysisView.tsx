@@ -1,4 +1,3 @@
-
 import React, { useState, useRef, useMemo, useEffect } from 'react';
 import { AnalysisResult, Citation, UploadedFile, BuyerSnapshot, OpeningLine, DocumentSummary, ObjectionPair } from '../types';
 import { ICONS } from '../constants';
@@ -16,7 +15,7 @@ interface AnalysisViewProps {
 }
 
 const getPriorityTheme = (text: string) => {
-  const lower = text.toLowerCase();
+  const lower = (text || "").toLowerCase();
   if (lower.includes('growth') || lower.includes('revenue') || lower.includes('scale')) 
     return { icon: <ICONS.Growth />, color: 'emerald', label: 'Expansion' };
   if (lower.includes('effic') || lower.includes('speed') || lower.includes('cost') || lower.includes('process')) 
@@ -76,14 +75,14 @@ export const AnalysisView: React.FC<AnalysisViewProps> = ({ result, files }) => 
     add(result.snapshot.decisionStyleCitation, "Decision Style", "snapshot-decision", "Trait");
     add(result.snapshot.riskToleranceCitation, "Risk Tolerance", "snapshot-risk", "Trait");
     
-    result.snapshot.priorities?.forEach((p, i) => add(p.citation, `Priority: ${p.text}`, `priority-${i}`, "Strategic"));
-    result.snapshot.likelyObjections?.forEach((o, i) => add(o.citation, `Objection: ${o.text}`, `objection-snap-${i}`, "Psychological"));
-    result.openingLines?.forEach((ol, i) => add(ol.citation, `Opener: ${ol.text}`, `opener-${i}`, "Conversation"));
-    result.predictedQuestions?.forEach((q, i) => add(q.citation, `Question: ${q.customerAsks}`, `predicted-q-${i}`, "Dialogue"));
-    result.strategicQuestionsToAsk?.forEach((s, i) => add(s.citation, `Discovery Q: ${s.question}`, `strategic-q-${i}`, "Dialogue"));
-    result.objectionHandling?.forEach((o, i) => add(o.citation, `Counter: ${o.objection}`, `objection-handle-${i}`, "Tactical"));
+    (result.snapshot.priorities || []).forEach((p, i) => add(p.citation, `Priority: ${p.text}`, `priority-${i}`, "Strategic"));
+    (result.snapshot.likelyObjections || []).forEach((o, i) => add(o.citation, `Objection: ${o.text}`, `objection-snap-${i}`, "Psychological"));
+    (result.openingLines || []).forEach((ol, i) => add(ol.citation, `Opener: ${ol.text}`, `opener-${i}`, "Conversation"));
+    (result.predictedQuestions || []).forEach((q, i) => add(q.citation, `Question: ${q.customerAsks}`, `predicted-q-${i}`, "Dialogue"));
+    (result.strategicQuestionsToAsk || []).forEach((s, i) => add(s.citation, `Discovery Q: ${s.question}`, `strategic-q-${i}`, "Dialogue"));
+    (result.objectionHandling || []).forEach((o, i) => add(o.citation, `Counter: ${o.objection}`, `objection-handle-${i}`, "Tactical"));
     
-    result.documentInsights.entities.forEach((ent, i) => {
+    (result.documentInsights.entities || []).forEach((ent, i) => {
       add(ent.citation, `${ent.type}: ${ent.name}`, `entity-${i}`, "Entity");
     });
 
@@ -93,8 +92,8 @@ export const AnalysisView: React.FC<AnalysisViewProps> = ({ result, files }) => 
   // Effect to handle objection expansion when evidence is inspected
   useEffect(() => {
     if (highlightedSnippet) {
-      result.objectionHandling.forEach((obj, i) => {
-        if (obj.citation.snippet === highlightedSnippet) {
+      (result.objectionHandling || []).forEach((obj, i) => {
+        if (obj.citation?.snippet === highlightedSnippet) {
           setExpandedObjections(prev => {
             const next = new Set(prev);
             next.add(i);
@@ -136,7 +135,7 @@ export const AnalysisView: React.FC<AnalysisViewProps> = ({ result, files }) => 
         doc.setFontSize(size);
         doc.setFont('helvetica', style);
         doc.setTextColor(...color);
-        const lines = doc.splitTextToSize(text, contentWidth);
+        const lines = doc.splitTextToSize(text || "", contentWidth);
         checkNewPage(lines.length * (size / 2) + 5);
         doc.text(lines, margin, y);
         y += (lines.length * (size / 2)) + 5;
@@ -150,7 +149,7 @@ export const AnalysisView: React.FC<AnalysisViewProps> = ({ result, files }) => 
         doc.setFontSize(14);
         doc.setFont('helvetica', 'bold');
         doc.setTextColor(30, 41, 59);
-        doc.text(title.toUpperCase(), margin + 6, y + 2);
+        doc.text((title || "").toUpperCase(), margin + 6, y + 2);
         y += 15;
       };
 
@@ -167,7 +166,7 @@ export const AnalysisView: React.FC<AnalysisViewProps> = ({ result, files }) => 
       y = 55;
 
       addSectionHeading("Buyer Psychology Profile");
-      addText(`Optimized for a ${result.snapshot.role} with a ${result.snapshot.decisionStyle.toLowerCase()} style.`, 11);
+      addText(`Optimized for a ${result.snapshot.role} with a ${(result.snapshot.decisionStyle || "").toLowerCase()} style.`, 11);
       y += 5;
       addText("Archetype:", 10, 'bold', [79, 70, 229]);
       addText(`${archetype.title}: ${archetype.desc}`, 11);
@@ -175,10 +174,10 @@ export const AnalysisView: React.FC<AnalysisViewProps> = ({ result, files }) => 
       addText(result.snapshot.riskTolerance, 11);
       
       addSectionHeading("Core Priorities");
-      result.snapshot.priorities.forEach(p => addText(`• ${p.text}`, 11));
+      (result.snapshot.priorities || []).forEach(p => addText(`• ${p.text}`, 11));
 
       addSectionHeading("Discovery Questions");
-      result.strategicQuestionsToAsk.forEach(sq => {
+      (result.strategicQuestionsToAsk || []).forEach(sq => {
         addText(`QUESTION: "${sq.question}"`, 11, 'bold');
         addText(`STRATEGIC INTENT: ${sq.whyItMatters}`, 10, 'italic', [100, 116, 139]);
         y += 5;
@@ -249,6 +248,7 @@ export const AnalysisView: React.FC<AnalysisViewProps> = ({ result, files }) => 
   };
 
   const scrollToSource = (citation: Citation) => {
+    if (!citation?.snippet) return;
     setHighlightedSnippet(citation.snippet);
     const explorer = document.getElementById('grounding-explorer');
     if (explorer) explorer.scrollIntoView({ behavior: 'smooth', block: 'start' });
@@ -361,9 +361,9 @@ export const AnalysisView: React.FC<AnalysisViewProps> = ({ result, files }) => 
                </div>
                
                <div className="grid grid-cols-1 md:grid-cols-2 gap-8">
-                  {result.snapshot.priorities.map((item, i) => {
+                  {(result.snapshot.priorities || []).map((item, i) => {
                     const theme = getPriorityTheme(item.text);
-                    const isGrounded = highlightedSnippet === item.citation.snippet;
+                    const isGrounded = highlightedSnippet === item.citation?.snippet;
                     return (
                       <div 
                         key={i} id={`priority-${i}`} 
@@ -405,7 +405,7 @@ export const AnalysisView: React.FC<AnalysisViewProps> = ({ result, files }) => 
             </div>
           </div>
           <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-            {result.documentInsights.summaries.map((summary, idx) => (
+            {(result.documentInsights.summaries || []).map((summary, idx) => (
               <div key={idx} className="p-8 bg-slate-50 border border-slate-100 rounded-[2.5rem] space-y-6 hover:bg-white hover:border-indigo-200 transition-all shadow-sm group">
                 <div className="flex justify-between items-start">
                    <h4 className="text-[11px] font-black uppercase text-indigo-500 tracking-[0.2em]">{summary.fileName}</h4>
@@ -416,7 +416,7 @@ export const AnalysisView: React.FC<AnalysisViewProps> = ({ result, files }) => 
                 </div>
                 <div className="pt-4 border-t border-slate-200/50">
                    <ul className="space-y-2">
-                     {summary.criticalInsights.map((insight, i) => (
+                     {(summary.criticalInsights || []).map((insight, i) => (
                        <li key={i} className="flex gap-3 text-xs text-slate-700 font-medium">
                           <span className="text-indigo-400 mt-0.5">●</span>
                           {insight}
@@ -485,8 +485,8 @@ export const AnalysisView: React.FC<AnalysisViewProps> = ({ result, files }) => 
           Strategic Conversation Openers
         </h3>
         <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
-          {result.openingLines.map((opener, i) => {
-            const isGrounded = highlightedSnippet === opener.citation.snippet;
+          {(result.openingLines || []).map((opener, i) => {
+            const isGrounded = highlightedSnippet === opener.citation?.snippet;
             const isPlaying = playingAudioId === `opener-${i}`;
             return (
               <div 
@@ -521,9 +521,9 @@ export const AnalysisView: React.FC<AnalysisViewProps> = ({ result, files }) => 
           Objection Handling & Defense
         </h3>
         <div className="space-y-6">
-          {result.objectionHandling.map((obj, i) => {
+          {(result.objectionHandling || []).map((obj, i) => {
             const isExpanded = expandedObjections.has(i);
-            const isGrounded = highlightedSnippet === obj.citation.snippet;
+            const isGrounded = highlightedSnippet === obj.citation?.snippet;
             const isPlaying = playingAudioId === `objection-resp-${i}`;
 
             return (
@@ -685,10 +685,11 @@ const DocumentHighlighter = ({ text, citations, onHighlightClick, highlightedSni
   onHighlightClick: (id: string) => void;
   highlightedSnippet: string | null;
 }) => {
-  if (!citations.length) return <>{text}</>;
-  const sortedCitations = [...citations].sort((a, b) => b.snippet.length - a.snippet.length);
+  if (!citations || !citations.length) return <>{text}</>;
+  const sortedCitations = [...citations].sort((a, b) => (b.snippet?.length || 0) - (a.snippet?.length || 0));
   let parts: React.ReactNode[] = [text];
   sortedCitations.forEach((cit) => {
+    if (!cit.snippet) return;
     const newParts: React.ReactNode[] = [];
     parts.forEach((part) => {
       if (typeof part !== 'string') { newParts.push(part); return; }
@@ -708,8 +709,8 @@ const DocumentHighlighter = ({ text, citations, onHighlightClick, highlightedSni
 };
 
 const SnapshotCard = ({ id, label, value, confidence, citation, activeSnippet, onViewSource }: { id: string; label: string; value: string; confidence: number; citation: Citation; activeSnippet: string | null; onViewSource: (c: Citation) => void }) => {
-  const active = activeSnippet === citation.snippet;
-  const score = Math.round(confidence * 100);
+  const active = citation && activeSnippet === citation.snippet;
+  const score = Math.round((confidence || 0) * 100);
   return (
     <div id={id} className={`p-8 rounded-[2.5rem] border flex flex-col justify-between transition-all duration-500 group relative ${active ? 'bg-indigo-600 border-indigo-600 shadow-2xl scale-[1.05] z-10' : 'bg-white/40 border-indigo-200/50 backdrop-blur-sm hover:shadow-2xl hover:bg-white hover:border-indigo-400 hover:-translate-y-1'}`}>
       <div className={`absolute top-6 right-6 transition-colors ${active ? 'text-indigo-200' : 'text-indigo-100 group-hover:text-indigo-400'}`}><ICONS.Shield /></div>
@@ -723,7 +724,9 @@ const SnapshotCard = ({ id, label, value, confidence, citation, activeSnippet, o
         <p className={`text-[10px] font-black uppercase tracking-[0.3em] mb-4 ${active ? 'text-indigo-100' : 'text-indigo-500'}`}>{label}</p>
         <p className={`text-xl font-black leading-tight tracking-tight ${active ? 'text-white' : 'text-slate-900'}`}>{value}</p>
       </div>
-      <button onClick={() => onViewSource(citation)} className={`mt-8 flex items-center gap-2 text-[10px] font-black uppercase tracking-widest transition-all transform ${active ? 'text-white' : 'text-indigo-500 opacity-0 group-hover:opacity-100 translate-y-3 group-hover:translate-y-0'}`}><ICONS.Document /> Verify Insight</button>
+      {citation && (
+        <button onClick={() => onViewSource(citation)} className={`mt-8 flex items-center gap-2 text-[10px] font-black uppercase tracking-widest transition-all transform ${active ? 'text-white' : 'text-indigo-500 opacity-0 group-hover:opacity-100 translate-y-3 group-hover:translate-y-0'}`}><ICONS.Document /> Verify Insight</button>
+      )}
     </div>
   );
 };

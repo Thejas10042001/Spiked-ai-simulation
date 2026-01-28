@@ -1,4 +1,3 @@
-
 import React, { useState, useRef, useMemo } from 'react';
 import { AnalysisResult } from '../types';
 import { ICONS } from '../constants';
@@ -33,24 +32,24 @@ export const AudioGenerator: React.FC<AudioGeneratorProps> = ({ analysis }) => {
       title: "Psychological Breakdown",
       description: "Understand the hidden drivers and risk profiles of your buyer.",
       script: `This briefing covers the psychological profile of the ${analysis.snapshot.role}. 
-               They prioritize ${analysis.snapshot.priorities.map(p => p.text).join(', ')}. 
-               Their decision style is ${analysis.snapshot.decisionStyle}, suggesting they need ${analysis.snapshot.decisionStyle.toLowerCase().includes('analytical') ? 'heavy data validation' : 'strong vision-driven proof'}. 
+               They prioritize ${(analysis.snapshot.priorities || []).map(p => p.text).join(', ')}. 
+               Their decision style is ${analysis.snapshot.decisionStyle}, suggesting they need ${(analysis.snapshot.decisionStyle || "").toLowerCase().includes('analytical') ? 'heavy data validation' : 'strong vision-driven proof'}. 
                Watch for their risk tolerance, which we've identified as ${analysis.snapshot.riskTolerance}.`
     },
     conversation: {
       title: "Conversation Rehearsal",
       description: "Exact wording for your opening hooks and discovery phase.",
-      script: `Let's rehearse the conversation. I recommend opening with: ${analysis.openingLines[0].text}. 
-               This sets a tone of ${analysis.openingLines[0].label}. 
-               Transition into these strategic discovery questions: ${analysis.strategicQuestionsToAsk.slice(0, 2).map(q => q.question).join('. ')}.`
+      script: `Let's rehearse the conversation. I recommend opening with: ${(analysis.openingLines || [])[0]?.text || "a professional introduction"}. 
+               This sets a tone of ${(analysis.openingLines || [])[0]?.label || "professionalism"}. 
+               Transition into these strategic discovery questions: ${(analysis.strategicQuestionsToAsk || []).slice(0, 2).map(q => q.question).join('. ')}.`
     },
     objections: {
       title: "Objection Battle-Drill",
       description: "Quick-fire responses for likely barriers grounded in data.",
-      script: `Be prepared for resistance. The primary objection we expect is: ${analysis.objectionHandling[0].objection}. 
-               When they say this, they likely mean: ${analysis.objectionHandling[0].realMeaning}. 
-               Respond with: ${analysis.objectionHandling[0].exactWording}. 
-               Stay focused on ${analysis.snapshot.priorities[0].text} throughout your defense.`
+      script: `Be prepared for resistance. The primary objection we expect is: ${(analysis.objectionHandling || [])[0]?.objection || "none yet identified"}. 
+               When they say this, they likely mean: ${(analysis.objectionHandling || [])[0]?.realMeaning || "something else"}. 
+               Respond with: ${(analysis.objectionHandling || [])[0]?.exactWording || "a clarifying question"}. 
+               Stay focused on ${(analysis.snapshot.priorities || [])[0]?.text || "the primary value proposition"} throughout your defense.`
     },
     custom: {
       title: "Dynamic Strategy Inquiry",
