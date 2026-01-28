@@ -18,7 +18,7 @@ const App: React.FC = () => {
   const [isAnalyzing, setIsAnalyzing] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [statusMessage, setStatusMessage] = useState("");
-  const [activeTab, setActiveTab] = useState<'context' | 'strategy' | 'search' | 'video' | 'practice'>('context');
+  const [activeTab, setActiveTab] = useState<'context' | 'strategy' | 'search' | 'video' | 'practice' | 'audio'>('context');
 
   // Memory Tracker: Fingerprint the state to avoid redundant re-analysis
   const lastAnalyzedHash = useRef<string | null>(null);
@@ -157,6 +157,7 @@ const App: React.FC = () => {
               <div className="flex items-center gap-2 overflow-x-auto no-scrollbar py-2">
                 <TabBtn active={activeTab === 'strategy'} onClick={() => setActiveTab('strategy')} icon={<ICONS.Document />} label="Brief" />
                 <TabBtn active={activeTab === 'search'} onClick={() => setActiveTab('search')} icon={<ICONS.Search />} label="Intelligence" />
+                <TabBtn active={activeTab === 'audio'} onClick={() => setActiveTab('audio')} icon={<ICONS.Speaker />} label="Audio" />
                 <TabBtn active={activeTab === 'practice'} onClick={() => setActiveTab('practice')} icon={<ICONS.Chat />} label="Live" />
                 <TabBtn active={activeTab === 'video'} onClick={() => setActiveTab('video')} icon={<ICONS.Play />} label="Visual" />
                 <TabBtn active={activeTab === 'context'} onClick={() => setActiveTab('context')} icon={<ICONS.Efficiency />} label="Config" />
@@ -173,6 +174,7 @@ const App: React.FC = () => {
             {activeTab === 'context' && <MeetingContextConfig context={meetingContext} onContextChange={setMeetingContext} />}
             {activeTab === 'strategy' && <AnalysisView result={analysis!} files={files} />}
             {activeTab === 'search' && <CognitiveSearch files={files} context={meetingContext} />}
+            {activeTab === 'audio' && <AudioGenerator analysis={analysis!} />}
             {activeTab === 'practice' && <PracticeSession analysis={analysis!} />}
             {activeTab === 'video' && <VideoGenerator analysis={analysis!} />}
           </div>
