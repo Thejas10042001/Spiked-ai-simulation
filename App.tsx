@@ -1,5 +1,5 @@
 
-import React, { useState, useCallback, useMemo } from 'react';
+import React, { useState, useCallback, useMemo, useRef } from 'react';
 import { Header } from './components/Header';
 import { FileUpload } from './components/FileUpload';
 import { AnalysisView } from './components/AnalysisView';
@@ -20,6 +20,9 @@ const App: React.FC = () => {
   const [statusMessage, setStatusMessage] = useState("");
   const [activeTab, setActiveTab] = useState<'context' | 'strategy' | 'search' | 'video' | 'practice'>('context');
 
+  // Memory Tracker: Fingerprint the state to avoid redundant re-analysis
+  const lastAnalyzedHash = useRef<string | null>(null);
+
   const [meetingContext, setMeetingContext] = useState<MeetingContext>({
     sellerCompany: "",
     sellerNames: "",
@@ -38,6 +41,12 @@ const App: React.FC = () => {
   const isAnyFileProcessing = useMemo(() => files.some(f => f.status === 'processing'), [files]);
   const readyFilesCount = useMemo(() => files.filter(f => f.status === 'ready').length, [files]);
 
+  const generateStateHash = useCallback(() => {
+    const fileIds = files.map(f => `${f.name}-${f.content.length}`).join('|');
+    const ctxString = JSON.stringify(meetingContext);
+    return `${fileIds}-${ctxString}`;
+  }, [files, meetingContext]);
+
   const runAnalysis = useCallback(async () => {
     const readyFiles = files.filter(f => f.status === 'ready');
     if (readyFiles.length === 0) {
@@ -45,21 +54,25 @@ const App: React.FC = () => {
       return;
     }
 
+    const currentHash = generateStateHash();
+    
+    // REDUNDANCY CHECK: If data hasn't changed, skip expensive call and use retained results
+    if (analysis && currentHash === lastAnalyzedHash.current) {
+      setActiveTab('strategy');
+      return;
+    }
+
     setIsAnalyzing(true);
     setError(null);
-    setStatusMessage("Extracting key themes and intent...");
+    setStatusMessage("Synthesizing Intelligence Core...");
 
     try {
       const combinedContent = readyFiles.map(f => `FILE: ${f.name}\n${f.content}`).join('\n\n');
-      const timer = setTimeout(() => setStatusMessage("Inferring buyer psychology..."), 2000);
-      const timer2 = setTimeout(() => setStatusMessage("Applying Cognitive Context..."), 4500);
-
+      
       const result = await analyzeSalesContext(combinedContent, meetingContext);
       
-      clearTimeout(timer);
-      clearTimeout(timer2);
-      
       setAnalysis(result);
+      lastAnalyzedHash.current = currentHash;
       setActiveTab('strategy');
     } catch (err: any) {
       console.error(err);
@@ -68,11 +81,12 @@ const App: React.FC = () => {
       setIsAnalyzing(false);
       setStatusMessage("");
     }
-  }, [files, meetingContext]);
+  }, [files, meetingContext, analysis, generateStateHash]);
 
   const reset = () => {
     setFiles([]);
     setAnalysis(null);
+    lastAnalyzedHash.current = null;
     setError(null);
     setActiveTab('context');
   };
@@ -89,7 +103,7 @@ const App: React.FC = () => {
                 Cognitive Sales Strategy Hub
               </h1>
               <p className="text-lg text-slate-500 max-w-2xl mx-auto leading-relaxed">
-                Define your meeting context, select your buyer's persona, and upload documents to generate a grounded sales engine.
+                Analyze buyer documents with a grounded intelligence agent to infer psychology and predict objections.
               </p>
             </div>
 
@@ -97,7 +111,7 @@ const App: React.FC = () => {
 
             <div className="bg-white rounded-[3rem] shadow-2xl p-10 border border-slate-200">
               <h3 className="text-xl font-bold text-slate-800 flex items-center gap-2 mb-8">
-                <ICONS.Document /> Grounding Source Documentation
+                <ICONS.Document /> Documentary Memory Store
               </h3>
               <FileUpload files={files} onFilesChange={setFiles} />
               
@@ -105,7 +119,7 @@ const App: React.FC = () => {
                 {error && (
                   <div className="bg-rose-50 border border-rose-100 rounded-2xl p-6 mb-8 max-w-xl text-center">
                     <p className="text-rose-600 font-bold mb-2">⚠️ Analysis Interrupted</p>
-                    <p className="text-rose-500 text-sm leading-relaxed">{error}</p>
+                    <p className="text-rose-500 text-sm">{error}</p>
                   </div>
                 )}
                 <button
@@ -119,7 +133,7 @@ const App: React.FC = () => {
                   `}
                 >
                   <ICONS.Brain />
-                  {isAnyFileProcessing ? 'Processing Documents...' : 'Synthesize Strategy Hub'}
+                  {isAnyFileProcessing ? 'Retaining Documents...' : 'Synthesize Strategy Core'}
                 </button>
               </div>
             </div>
@@ -134,7 +148,7 @@ const App: React.FC = () => {
             </div>
             <div className="text-center">
               <p className="text-2xl font-bold text-slate-800 animate-pulse tracking-tight">{statusMessage}</p>
-              <p className="text-sm text-slate-400 mt-3 font-medium uppercase tracking-[0.2em]">Cognitive Intelligence Agent Online</p>
+              <p className="text-sm text-slate-400 mt-3 font-medium uppercase tracking-[0.2em]">High-Speed Intelligence Engine Online</p>
             </div>
           </div>
         ) : (
@@ -147,7 +161,13 @@ const App: React.FC = () => {
                 <TabBtn active={activeTab === 'video'} onClick={() => setActiveTab('video')} icon={<ICONS.Play />} label="Visual" />
                 <TabBtn active={activeTab === 'context'} onClick={() => setActiveTab('context')} icon={<ICONS.Efficiency />} label="Config" />
               </div>
-              <button onClick={reset} className="px-5 py-2.5 bg-slate-50 text-slate-500 text-[9px] font-black uppercase tracking-widest rounded-xl hover:bg-rose-50 hover:text-rose-600 transition-all border border-slate-200">Reset Engine</button>
+              <div className="flex items-center gap-4">
+                 <div className="flex items-center gap-2 px-4 py-2 bg-emerald-50 text-emerald-600 rounded-full border border-emerald-100">
+                    <div className="w-2 h-2 bg-emerald-500 rounded-full animate-pulse"></div>
+                    <span className="text-[10px] font-black uppercase tracking-widest">Strategy Retained</span>
+                 </div>
+                 <button onClick={reset} className="px-5 py-2.5 bg-slate-50 text-slate-500 text-[9px] font-black uppercase tracking-widest rounded-xl hover:bg-rose-50 hover:text-rose-600 transition-all border border-slate-200">Wipe Context</button>
+              </div>
             </div>
 
             {activeTab === 'context' && <MeetingContextConfig context={meetingContext} onContextChange={setMeetingContext} />}
