@@ -4,16 +4,25 @@ import { AnalysisResult, MeetingContext } from "../types";
 
 const ai = new GoogleGenAI({ apiKey: process.env.API_KEY });
 
+/**
+ * Advanced Semantic OCR using Gemini 3 Pro.
+ */
 export async function performVisionOcr(base64Data: string, mimeType: string): Promise<string> {
-  // Use gemini-3-flash-preview for basic text extraction tasks
-  const modelName = 'gemini-3-flash-preview';
+  const modelName = 'gemini-3-pro-preview'; 
   try {
     const response = await ai.models.generateContent({
       model: modelName,
       contents: {
         parts: [
           { inlineData: { data: base64Data, mimeType: mimeType } },
-          { text: "Extract all text from this image exactly as written." },
+          { 
+            text: `Act as a high-precision Cognitive OCR engine. 
+            TRANSCRIPTION OBJECTIVE:
+            1. EXTRACT ALL text from this image with 100% fidelity.
+            2. LAYOUT: Maintain the structural hierarchy of the document.
+            3. TABLES: Reconstruct into clean Markdown tables.
+            4. ZERO COMMENTARY: Output only the extracted text.` 
+          },
         ],
       },
     });
@@ -34,10 +43,6 @@ export interface CognitiveSearchResult {
   };
 }
 
-/**
- * Performs complex reasoning to map client pain points to capabilities.
- * Upgraded to gemini-3-pro-preview for advanced reasoning.
- */
 export async function performCognitiveSearch(question: string, filesContent: string, context: MeetingContext): Promise<CognitiveSearchResult> {
   const modelName = 'gemini-3-pro-preview';
   
@@ -46,10 +51,20 @@ export async function performCognitiveSearch(question: string, filesContent: str
   Client: ${context.clientNames} at ${context.clientCompany}
   Focus: ${context.meetingFocus}
   Strategic Keywords: ${context.strategicKeywords.join(', ')}
-  Snapshot: ${context.executiveSnapshot}
 
-  TASK: Perform COGNITIVE GROUNDING to answer the question using the source documents.
-  REASONING STYLE: Map Client Pain Point (from KYC/docs) -> SpikedAI Capability -> Strategic Value.
+  TASK: Perform a HIGH-FIDELITY SALES STRATEGY analysis to answer the following question using the source documents.
+  
+  REQUIRED OUTPUT STRUCTURE:
+  1. **EXECUTIVE OVERVIEW**: A high-impact summary of the strategic alignment.
+  2. **THE PROBLEM SPACE**: Use *Italicized Subheadings* to identify specific pain points from the docs.
+  3. **THE STRATEGIC SOLUTION**: Map organization capabilities directly to those pain points.
+  4. **DETAILED SALES JUSTIFICATION**: Provide a deep, logical explanation of *why* this approach works, focusing on ROI, risk mitigation, and long-term value.
+  
+  FORMATTING RULES:
+  - Use **BOLD UPPERCASE** for major section headers (e.g., **EXECUTIVE OVERVIEW**).
+  - Use *Italicized Text* for sub-points or to provide nuanced context.
+  - Use **Bold** for critical keywords, metrics, or key takeaways.
+  - Ensure the explanation is highly detailed and grounded in the provided files.
 
   QUESTION: ${question}
   
@@ -57,7 +72,7 @@ export async function performCognitiveSearch(question: string, filesContent: str
   ${filesContent || "No documents uploaded yet."}
   
   Return your response ONLY as a JSON object with:
-  - "answer": A comprehensive response following the requested Answer Styles: ${context.answerStyles.join(', ')}.
+  - "answer": The detailed, beautifully formatted Markdown response.
   - "citations": Array of { "snippet": string, "source": string }.
   - "reasoningChain": { "painPoint": string, "capability": string, "strategicValue": string }`;
 
@@ -66,7 +81,7 @@ export async function performCognitiveSearch(question: string, filesContent: str
       model: modelName,
       contents: prompt,
       config: {
-        systemInstruction: `ACT AS: Avi from Spiked. ${context.baseSystemPrompt}`,
+        systemInstruction: `You are a Cognitive AI Sales Intelligence & Conversation Strategy Agent. ${context.baseSystemPrompt}. You communicate with precision, authority, and deep logical justification. Your goal is to win high-stakes enterprise deals through documentary evidence.`,
         responseMimeType: "application/json",
         responseSchema: {
           type: Type.OBJECT,
@@ -105,7 +120,77 @@ export async function performCognitiveSearch(question: string, filesContent: str
     return JSON.parse(text);
   } catch (error: any) {
     console.error("Cognitive search failed:", error);
-    throw new Error("Could not retrieve a grounded answer. Ensure documents are uploaded.");
+    throw new Error("Could not retrieve a grounded answer.");
+  }
+}
+
+export async function generateDynamicSuggestions(filesContent: string, context: MeetingContext): Promise<string[]> {
+  const modelName = 'gemini-3-flash-preview';
+  const prompt = `Suggest 3 highly strategic sales questions for this context:
+  Seller: ${context.sellerCompany} (Product: ${context.targetProducts})
+  Client: ${context.clientCompany}
+  Meeting Focus: ${context.meetingFocus}
+  
+  Return ONLY a JSON array of 3 strings.`;
+
+  try {
+    const response = await ai.models.generateContent({
+      model: modelName,
+      contents: prompt,
+      config: {
+        responseMimeType: "application/json",
+        responseSchema: {
+          type: Type.ARRAY,
+          items: { type: Type.STRING }
+        }
+      }
+    });
+    return JSON.parse(response.text || "[]");
+  } catch (error) {
+    return [
+      `What are the top 3 deal risks for ${context.clientCompany}?`,
+      `How does ${context.targetProducts} map to their stated growth priorities?`,
+      `What technical objections should I anticipate?`
+    ];
+  }
+}
+
+export interface VideoStoryboard {
+  id: string;
+  title: string;
+  angle: string;
+  description: string;
+  veoPrompt: string;
+}
+
+export async function generateVideoStoryboard(analysis: AnalysisResult): Promise<VideoStoryboard[]> {
+  const modelName = 'gemini-3-pro-preview';
+  const prompt = `Create 3 distinct 10-second video concepts for: ${analysis.snapshot.role}. Tone: ${analysis.snapshot.tone}.`;
+  try {
+    const response = await ai.models.generateContent({
+      model: modelName,
+      contents: prompt,
+      config: {
+        responseMimeType: "application/json",
+        responseSchema: {
+          type: Type.ARRAY,
+          items: {
+            type: Type.OBJECT,
+            properties: {
+              id: { type: Type.STRING },
+              title: { type: Type.STRING },
+              angle: { type: Type.STRING },
+              description: { type: Type.STRING },
+              veoPrompt: { type: Type.STRING }
+            },
+            required: ["id", "title", "angle", "description", "veoPrompt"]
+          }
+        }
+      }
+    });
+    return JSON.parse(response.text || "[]");
+  } catch (error) {
+    return [];
   }
 }
 
@@ -129,52 +214,33 @@ export async function getVideoStatus(operationId: any) {
 
 export function decode(base64: string) {
   const binaryString = atob(base64);
-  const len = binaryString.length;
-  const bytes = new Uint8Array(len);
-  for (let i = 0; i < len; i++) {
-    bytes[i] = binaryString.charCodeAt(i);
-  }
+  const bytes = new Uint8Array(binaryString.length);
+  for (let i = 0; i < binaryString.length; i++) bytes[i] = binaryString.charCodeAt(i);
   return bytes;
 }
 
-export async function decodeAudioData(
-  data: Uint8Array,
-  ctx: AudioContext,
-  sampleRate: number,
-  numChannels: number,
-): Promise<AudioBuffer> {
+export async function decodeAudioData(data: Uint8Array, ctx: AudioContext, sampleRate: number, numChannels: number): Promise<AudioBuffer> {
   const dataInt16 = new Int16Array(data.buffer);
   const frameCount = dataInt16.length / numChannels;
   const buffer = ctx.createBuffer(numChannels, frameCount, sampleRate);
-
   for (let channel = 0; channel < numChannels; channel++) {
     const channelData = buffer.getChannelData(channel);
-    for (let i = 0; i < frameCount; i++) {
-      channelData[i] = dataInt16[i * numChannels + channel] / 32768.0;
-    }
+    for (let i = 0; i < frameCount; i++) channelData[i] = dataInt16[i * numChannels + channel] / 32768.0;
   }
   return buffer;
 }
 
 export async function generateExplanation(question: string, context: AnalysisResult): Promise<string> {
-  const prompt = `Based on the following sales analysis:
-  ${JSON.stringify(context, null, 2)}
-  
-  Please answer this salesperson's question about the strategy: "${question}"
-  Provide a concise, professional, and coaching-oriented explanation in about 2-3 sentences. Speak as a senior sales mentor.`;
-
+  const prompt = `Based on this analysis: ${JSON.stringify(context, null, 2)}\nAnswer: "${question}"`;
   try {
     const response = await ai.models.generateContent({
       model: 'gemini-3-flash-preview',
       contents: prompt,
-      config: {
-        systemInstruction: "You are a senior sales consultant providing verbal coaching. Keep it brief and high-impact."
-      }
+      config: { systemInstruction: "You are a senior sales consultant." }
     });
-    return response.text || "I'm sorry, I couldn't formulate an explanation for that.";
+    return response.text || "";
   } catch (error) {
-    console.error("Explanation generation failed:", error);
-    return "I encountered an error while trying to analyze that specific question.";
+    return "";
   }
 }
 
@@ -186,27 +252,17 @@ export async function generatePitchAudio(text: string, voiceName: string = 'Kore
       contents: [{ parts: [{ text: text }] }],
       config: {
         responseModalities: [Modality.AUDIO],
-        speechConfig: {
-          voiceConfig: {
-            prebuiltVoiceConfig: { voiceName: voiceName },
-          },
-        },
+        speechConfig: { voiceConfig: { prebuiltVoiceConfig: { voiceName: voiceName } } },
       },
     });
-
     const base64Audio = response.candidates?.[0]?.content?.parts?.[0]?.inlineData?.data;
     if (!base64Audio) return null;
     return decode(base64Audio);
   } catch (error) {
-    console.error("Audio generation failed:", error);
     return null;
   }
 }
 
-/**
- * Performs core analysis of sales context and documents.
- * Upgraded to gemini-3-pro-preview for complex reasoning and synthesis.
- */
 export async function analyzeSalesContext(filesContent: string, context: MeetingContext): Promise<AnalysisResult> {
   const modelName = 'gemini-3-pro-preview';
   const citationSchema = {
@@ -218,14 +274,6 @@ export async function analyzeSalesContext(filesContent: string, context: Meeting
     required: ["snippet", "sourceFile"],
   };
 
-  const systemInstruction = `You are a Cognitive AI Sales Intelligence Agent. 
-  PERSONA: ${context.persona}
-  TARGET: ${context.clientNames} at ${context.clientCompany}
-  ${context.baseSystemPrompt}
-  
-  Structure your entire response as a single valid JSON object adhering strictly to the provided schema. 
-  Ensure all citations are derived from the source documents provided.`;
-
   const responseSchema = {
     type: Type.OBJECT,
     properties: {
@@ -234,35 +282,45 @@ export async function analyzeSalesContext(filesContent: string, context: Meeting
         properties: {
           role: { type: Type.STRING },
           roleCitation: citationSchema,
+          roleConfidence: { type: Type.NUMBER },
           priorities: { type: Type.ARRAY, items: { type: Type.OBJECT, properties: { text: { type: Type.STRING }, citation: citationSchema }, required: ["text", "citation"] } },
           likelyObjections: { type: Type.ARRAY, items: { type: Type.OBJECT, properties: { text: { type: Type.STRING }, citation: citationSchema }, required: ["text", "citation"] } },
           decisionStyle: { type: Type.STRING },
           decisionStyleCitation: citationSchema,
+          decisionStyleConfidence: { type: Type.NUMBER },
           riskTolerance: { type: Type.STRING },
           riskToleranceCitation: citationSchema,
+          riskToleranceConfidence: { type: Type.NUMBER },
           tone: { type: Type.STRING },
         },
-        required: ["role", "roleCitation", "priorities", "likelyObjections", "decisionStyle", "decisionStyleCitation", "riskTolerance", "riskToleranceCitation", "tone"],
+        required: ["role", "roleCitation", "roleConfidence", "priorities", "likelyObjections", "decisionStyle", "decisionStyleCitation", "decisionStyleConfidence", "riskTolerance", "riskToleranceCitation", "riskToleranceConfidence", "tone"],
       },
       documentInsights: {
         type: Type.OBJECT,
         properties: {
           entities: { type: Type.ARRAY, items: { type: Type.OBJECT, properties: { name: { type: Type.STRING }, type: { type: Type.STRING }, context: { type: Type.STRING }, citation: citationSchema }, required: ["name", "type", "context", "citation"] } },
-          structure: { type: Type.OBJECT, properties: { sections: { type: Type.ARRAY, items: { type: Type.STRING } }, keyHeadings: { type: Type.ARRAY, items: { type: Type.STRING } }, detectedTablesSummary: { type: Type.STRING } }, required: ["sections", "keyHeadings", "detectedTablesSummary"] }
+          structure: { type: Type.OBJECT, properties: { sections: { type: Type.ARRAY, items: { type: Type.STRING } }, keyHeadings: { type: Type.ARRAY, items: { type: Type.STRING } }, detectedTablesSummary: { type: Type.STRING } }, required: ["sections", "keyHeadings", "detectedTablesSummary"] },
+          summaries: {
+            type: Type.ARRAY,
+            items: {
+              type: Type.OBJECT,
+              properties: {
+                fileName: { type: Type.STRING },
+                summary: { type: Type.STRING },
+                strategicImpact: { type: Type.STRING },
+                criticalInsights: { type: Type.ARRAY, items: { type: Type.STRING } }
+              },
+              required: ["fileName", "summary", "strategicImpact", "criticalInsights"]
+            }
+          }
         },
-        required: ["entities", "structure"]
+        required: ["entities", "structure", "summaries"]
       },
       openingLines: { 
         type: Type.ARRAY, 
-        minItems: 2,
-        maxItems: 3,
         items: { 
           type: Type.OBJECT, 
-          properties: { 
-            text: { type: Type.STRING }, 
-            label: { type: Type.STRING },
-            citation: citationSchema 
-          }, 
+          properties: { text: { type: Type.STRING }, label: { type: Type.STRING }, citation: citationSchema }, 
           required: ["text", "label", "citation"] 
         } 
       },
@@ -275,17 +333,24 @@ export async function analyzeSalesContext(filesContent: string, context: Meeting
     required: ["snapshot", "documentInsights", "openingLines", "predictedQuestions", "strategicQuestionsToAsk", "objectionHandling", "toneGuidance", "finalCoaching"]
   };
 
-  const prompt = `Analyze these documents for ${context.clientCompany}. 
-  Meeting Focus: ${context.meetingFocus}
-  Strategic Context: ${context.executiveSnapshot}
-  --- DOCUMENTS --- ${filesContent} --- END DOCUMENTS ---`;
+  const prompt = `ACT AS: Cognitive AI Sales Intelligence Agent.
+  
+  CONTEXT:
+  Target Client: ${context.clientCompany}
+  Meeting Goal: ${context.meetingFocus}
+  Product: ${context.targetProducts}
+
+  --- SOURCE DOCUMENTS ---
+  ${filesContent}
+  
+  Return analysis as JSON. Ground every strategic point in documentary evidence.`;
 
   try {
     const response = await ai.models.generateContent({
       model: modelName,
       contents: prompt,
       config: {
-        systemInstruction,
+        systemInstruction: `You are a world-class sales analyst. Ground everything in documentary proof.`,
         responseMimeType: "application/json",
         responseSchema,
         thinkingConfig: { thinkingBudget: 12000 }
@@ -298,9 +363,6 @@ export async function analyzeSalesContext(filesContent: string, context: Meeting
     
     return JSON.parse(text) as AnalysisResult;
   } catch (error: any) {
-    if (error.message?.includes('429')) {
-      throw new Error("Gemini API Rate Limit Reached. Please wait 60s.");
-    }
-    throw new Error(`Intelligence Analysis Failed: ${error.message}`);
+    throw new Error(`Analysis Failed: ${error.message}`);
   }
 }

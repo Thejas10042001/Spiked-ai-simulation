@@ -21,18 +21,18 @@ const App: React.FC = () => {
   const [activeTab, setActiveTab] = useState<'context' | 'strategy' | 'search' | 'video' | 'practice'>('context');
 
   const [meetingContext, setMeetingContext] = useState<MeetingContext>({
-    sellerCompany: "SpikedAI",
-    sellerNames: "Avi Sahi",
-    clientCompany: "Harbor Best Investments",
-    clientNames: "Jason",
-    targetProducts: "Intelligence Layer",
-    productDomain: "FinTech Sales",
-    meetingFocus: "Reducing Investment Risk & Increasing Velocity",
+    sellerCompany: "",
+    sellerNames: "",
+    clientCompany: "",
+    clientNames: "",
+    targetProducts: "",
+    productDomain: "",
+    meetingFocus: "",
     persona: "Balanced",
-    answerStyles: ["Concise Answer", "Sales Points"],
-    executiveSnapshot: "Focusing on scaling deal velocity while reducing investment risk.",
-    strategicKeywords: ["SpikedAI", "Predictive Intelligence", "Harbor"],
-    baseSystemPrompt: "Act as a Cognitive AI Sales Intelligence Agent..."
+    answerStyles: [],
+    executiveSnapshot: "",
+    strategicKeywords: [],
+    baseSystemPrompt: ""
   });
 
   const isAnyFileProcessing = useMemo(() => files.some(f => f.status === 'processing'), [files]);
@@ -134,7 +134,7 @@ const App: React.FC = () => {
             </div>
             <div className="text-center">
               <p className="text-2xl font-bold text-slate-800 animate-pulse tracking-tight">{statusMessage}</p>
-              <p className="text-sm text-slate-400 mt-3 font-medium uppercase tracking-[0.2em]">Avi Persona Activated</p>
+              <p className="text-sm text-slate-400 mt-3 font-medium uppercase tracking-[0.2em]">Cognitive Intelligence Agent Online</p>
             </div>
           </div>
         ) : (

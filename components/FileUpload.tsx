@@ -21,6 +21,10 @@ export const FileUpload: React.FC<FileUploadProps> = ({ onFilesChange, files }) 
   const [ocrProgress, setOcrProgress] = useState<number>(0);
   const [isCognitiveOcr, setIsCognitiveOcr] = useState<boolean>(false);
 
+  /**
+   * Advanced image enhancement for maximum OCR accuracy.
+   * Performs luminance normalization, adaptive thresholding, and edge sharpening.
+   */
   const preprocessCanvas = (canvas: HTMLCanvasElement) => {
     const ctx = canvas.getContext('2d');
     if (!ctx) return;
@@ -28,19 +32,86 @@ export const FileUpload: React.FC<FileUploadProps> = ({ onFilesChange, files }) 
     const imageData = ctx.getImageData(0, 0, canvas.width, canvas.height);
     const data = imageData.data;
 
+    // 1. Luminance Normalization & Background Whitening
+    // We calculate min/max brightness to stretch the histogram
+    let min = 255;
+    let max = 0;
     for (let i = 0; i < data.length; i += 4) {
-      // Grayscale
-      const gray = 0.2126 * data[i] + 0.7152 * data[i + 1] + 0.0722 * data[i + 2];
-      
-      // Basic contrast enhancement
-      let contrasted = (gray - 128) * 1.5 + 128;
-      contrasted = Math.max(0, Math.min(255, contrasted));
+      const avg = (data[i] + data[i + 1] + data[i + 2]) / 3;
+      if (avg < min) min = avg;
+      if (avg > max) max = avg;
+    }
 
-      data[i] = contrasted;
-      data[i + 1] = contrasted;
-      data[i + 2] = contrasted;
+    const range = max - min || 1;
+    for (let i = 0; i < data.length; i += 4) {
+      const r = data[i];
+      const g = data[i + 1];
+      const b = data[i + 2];
+      
+      // Grayscale conversion
+      let gray = 0.2126 * r + 0.7152 * g + 0.0722 * b;
+      
+      // Histogram stretch
+      gray = ((gray - min) / range) * 255;
+
+      // Adaptive background whitening: push light grays to pure white
+      if (gray > 200) gray = 255;
+      // Push dark grays to pure black for better contrast
+      if (gray < 50) gray = 0;
+
+      data[i] = gray;
+      data[i + 1] = gray;
+      data[i + 2] = gray;
     }
     ctx.putImageData(imageData, 0, 0);
+
+    // 2. High-Pass Sharpening Filter (3x3 Kernel)
+    // Stronger sharpen kernel to define character edges
+    const sharpenKernel = [
+       0, -1,  0,
+      -1,  5, -1,
+       0, -1,  0
+    ];
+    applyConvolution(canvas, sharpenKernel);
+  };
+
+  const applyConvolution = (canvas: HTMLCanvasElement, kernel: number[]) => {
+    const ctx = canvas.getContext('2d');
+    if (!ctx) return;
+    const weights = kernel;
+    const side = Math.round(Math.sqrt(weights.length));
+    const halfSide = Math.floor(side / 2);
+    const src = ctx.getImageData(0, 0, canvas.width, canvas.height);
+    const sw = src.width;
+    const sh = src.height;
+    const output = ctx.createImageData(sw, sh);
+    const dst = output.data;
+    const srcData = src.data;
+
+    for (let y = 0; y < sh; y++) {
+      for (let x = 0; x < sw; x++) {
+        const dstOff = (y * sw + x) * 4;
+        let r = 0, g = 0, b = 0;
+        for (let cy = 0; cy < side; cy++) {
+          for (let cx = 0; cx < side; cx++) {
+            const scy = y + cy - halfSide;
+            const scx = x + cx - halfSide;
+            if (scy >= 0 && scy < sh && scx >= 0 && scx < sw) {
+              const srcOff = (scy * sw + scx) * 4;
+              const wt = weights[cy * side + cx];
+              r += srcData[srcOff] * wt;
+              g += srcData[srcOff + 1] * wt;
+              b += srcData[srcOff + 2] * wt;
+            }
+          }
+        }
+        dst[dstOff] = Math.min(255, Math.max(0, r));
+        dst[dstOff + 1] = Math.min(255, Math.max(0, g));
+        dst[dstOff + 2] = Math.min(255, Math.max(0, b));
+        dst[dstOff + 3] = srcData[dstOff + 3];
+      }
+    }
+    ctx.putImageData(output, 0, 0);
   };
 
   const extractTextFromPdf = async (arrayBuffer: ArrayBuffer, fileName: string): Promise<string> => {
@@ -49,7 +120,7 @@ export const FileUpload: React.FC<FileUploadProps> = ({ onFilesChange, files }) 
     const pdf = await loadingTask.promise;
     let fullText = "";
     
-    // Try normal text extraction first
+    // Attempt standard text layer extraction first
     for (let i = 1; i <= pdf.numPages; i++) {
       const page = await pdf.getPage(i);
       const textContent = await page.getTextContent();
@@ -57,10 +128,10 @@ export const FileUpload: React.FC<FileUploadProps> = ({ onFilesChange, files }) 
       fullText += pageText + "\n";
     }
 
-    // High-density check: If text is suspiciously short or disorganized, use Cognitive OCR
+    // engages Cognitive OCR if the PDF is purely image-based or has low text density
     const densityThreshold = 50 * pdf.numPages;
     if (fullText.trim().length < densityThreshold && pdf.numPages > 0) {
-      console.log(`PDF text density low (${fullText.length} chars). Engaging Cognitive Vision OCR...`);
+      console.log(`Engaging High-Fidelity Cognitive Vision OCR for: ${fileName}`);
       setIsCognitiveOcr(true);
       fullText = await performCognitiveOcr(pdf);
       setIsCognitiveOcr(false);
@@ -77,8 +148,8 @@ export const FileUpload: React.FC<FileUploadProps> = ({ onFilesChange, files }) 
       setOcrProgress(Math.round((i / numPages) * 100));
       const page = await pdf.getPage(i);
       
-      // Render page at high scale for maximum clarity
-      const viewport = page.getViewport({ scale: 2.5 }); 
+      // Render page at EXTREMELY HIGH scale (4.0x) for maximum detail preservation
+      const viewport = page.getViewport({ scale: 4.0 }); 
       const canvas = document.createElement('canvas');
       const context = canvas.getContext('2d');
       canvas.height = viewport.height;
@@ -86,18 +157,50 @@ export const FileUpload: React.FC<FileUploadProps> = ({ onFilesChange, files }) 
 
       await page.render({ canvasContext: context, viewport }).promise;
       
-      // Apply visual pre-processing to clean up the scan
+      // Enhance pixel quality for OCR
       preprocessCanvas(canvas);
 
-      // Convert canvas to base64 for Gemini Vision
-      const base64Data = canvas.toDataURL('image/jpeg', 0.85).split(',')[1];
-      
-      // Send to Gemini for advanced semantic OCR
-      const extractedText = await performVisionOcr(base64Data, 'image/jpeg');
+      // Use PNG (Lossless) to avoid JPEG compression artifacts that can confuse OCR
+      const base64Data = canvas.toDataURL('image/png').split(',')[1];
+      const extractedText = await performVisionOcr(base64Data, 'image/png');
       combinedText += `--- PAGE ${i} ---\n${extractedText}\n\n`;
     }
     setOcrProgress(0);
     return combinedText;
+  };
+
+  const extractTextFromImage = async (file: File): Promise<string> => {
+    setIsCognitiveOcr(true);
+    setOcrProgress(50);
+    
+    return new Promise((resolve, reject) => {
+      const reader = new FileReader();
+      reader.onload = async (e) => {
+        const img = new Image();
+        img.onload = async () => {
+          const canvas = document.createElement('canvas');
+          canvas.width = img.width;
+          canvas.height = img.height;
+          const ctx = canvas.getContext('2d');
+          ctx?.drawImage(img, 0, 0);
+          
+          if (canvas) preprocessCanvas(canvas);
+          
+          const base64Data = canvas.toDataURL('image/png').split(',')[1];
+          try {
+            const text = await performVisionOcr(base64Data, 'image/png');
+            setOcrProgress(0);
+            setIsCognitiveOcr(false);
+            resolve(text);
+          } catch (err) {
+            reject(err);
+          }
+        };
+        img.src = e.target?.result as string;
+      };
+      reader.onerror = reject;
+      reader.readAsDataURL(file);
+    });
   };
 
   const extractTextFromDocx = async (arrayBuffer: ArrayBuffer): Promise<string> => {
@@ -106,16 +209,10 @@ export const FileUpload: React.FC<FileUploadProps> = ({ onFilesChange, files }) 
     return result.value;
   };
 
-  /**
-   * Fixes property access errors on 'unknown' by explicitly typing fileList and the map parameters.
-   */
   const handleFileChange = async (e: React.ChangeEvent<HTMLInputElement>) => {
     if (!e.target.files) return;
 
-    // Explicitly type fileList as File[] to resolve 'unknown' errors
     const fileList: File[] = Array.from(e.target.files);
-    
-    // Type the map parameter f as File
     const placeholders: UploadedFile[] = fileList.map((f: File) => ({
       name: f.name,
       content: '',
@@ -129,20 +226,23 @@ export const FileUpload: React.FC<FileUploadProps> = ({ onFilesChange, files }) 
     let currentFilesState = [...initialFiles];
     
     for (let i = 0; i < fileList.length; i++) {
-      // file is correctly inferred as File here
       const file = fileList[i];
       try {
         let text = "";
-        const arrayBuffer = await file.arrayBuffer();
-
+        
         if (file.type === 'application/pdf' || file.name.endsWith('.pdf')) {
+          const arrayBuffer = await file.arrayBuffer();
           text = await extractTextFromPdf(arrayBuffer, file.name);
+        } else if (file.type.startsWith('image/')) {
+          text = await extractTextFromImage(file);
         } else if (
           file.type === 'application/vnd.openxmlformats-officedocument.wordprocessingml.document' || 
           file.name.endsWith('.docx')
         ) {
+          const arrayBuffer = await file.arrayBuffer();
           text = await extractTextFromDocx(arrayBuffer);
         } else {
+          const arrayBuffer = await file.arrayBuffer();
           text = new TextDecoder().decode(arrayBuffer);
         }
         
@@ -185,14 +285,14 @@ export const FileUpload: React.FC<FileUploadProps> = ({ onFilesChange, files }) 
           className="hidden" 
           ref={fileInputRef}
           onChange={handleFileChange}
-          accept=".txt,.csv,.md,.json,.pdf,.docx"
+          accept=".txt,.csv,.md,.json,.pdf,.docx,image/*"
         />
         <div className="flex flex-col items-center">
           <div className="w-12 h-12 bg-indigo-50 text-indigo-600 rounded-full flex items-center justify-center mb-3">
             <ICONS.Document />
           </div>
           <p className="text-slate-700 font-medium">Click to upload sales documents</p>
-          <p className="text-slate-400 text-sm mt-1">Accepts PDF (w/ Advanced Vision OCR), Word, TXT, CSV, MD, JSON</p>
+          <p className="text-slate-400 text-sm mt-1">PDF (Scans), Images (Photos), Word, TXT, CSV, MD</p>
         </div>
       </div>
 
@@ -221,7 +321,7 @@ export const FileUpload: React.FC<FileUploadProps> = ({ onFilesChange, files }) 
                     <div className="flex items-center gap-2">
                       <div className="w-3 h-3 border-2 border-indigo-200 border-t-indigo-500 rounded-full animate-spin"></div>
                       <span className="text-[10px] font-black text-indigo-600 uppercase tracking-widest animate-pulse">
-                        {isCognitiveOcr ? `Cognitive Vision Engine (${ocrProgress}%)` : 'Parsing Structure...'}
+                        {isCognitiveOcr ? `High-Fidelity OCR Engine (${ocrProgress}%)` : 'Parsing Structure...'}
                       </span>
                     </div>
                   )}

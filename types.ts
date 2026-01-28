@@ -27,15 +27,25 @@ export interface DocumentStructure {
   detectedTablesSummary: string;
 }
 
+export interface DocumentSummary {
+  fileName: string;
+  summary: string;
+  strategicImpact: string;
+  criticalInsights: string[];
+}
+
 export interface BuyerSnapshot {
   role: string;
   roleCitation: Citation;
+  roleConfidence: number; // 0 to 1
   priorities: PriorityItem[];
   likelyObjections: ObjectionItem[];
   decisionStyle: string;
   decisionStyleCitation: Citation;
+  decisionStyleConfidence: number; // 0 to 1
   riskTolerance: string;
   riskToleranceCitation: Citation;
+  riskToleranceConfidence: number; // 0 to 1
   tone: string;
 }
 
@@ -72,6 +82,7 @@ export interface AnalysisResult {
   documentInsights: {
     entities: DocumentEntity[];
     structure: DocumentStructure;
+    summaries: DocumentSummary[];
   };
   openingLines: OpeningLine[];
   predictedQuestions: QuestionPair[];
