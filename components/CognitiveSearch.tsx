@@ -206,6 +206,24 @@ export const CognitiveSearch: React.FC<CognitiveSearchProps> = ({ files, context
                   <ICONS.X className="w-3 h-3" /> New Inquiry
                 </button>
               </div>
+
+              {/* NEW: BRIEF EXPLANATION CALLOUT */}
+              <div className="bg-slate-900 rounded-[2.5rem] p-10 shadow-2xl relative overflow-hidden border border-slate-800 animate-in slide-in-from-top-4 duration-1000">
+                <div className="absolute top-0 right-0 p-6 opacity-20">
+                  <ICONS.Play className="w-20 h-20 text-indigo-400" />
+                </div>
+                <div className="relative z-10 flex flex-col md:flex-row gap-8 items-start">
+                  <div className="shrink-0 p-4 bg-indigo-500 text-white rounded-2xl shadow-xl shadow-indigo-500/20">
+                    <ICONS.Efficiency />
+                  </div>
+                  <div className="space-y-4">
+                    <h4 className="text-[10px] font-black uppercase tracking-[0.4em] text-indigo-400">Executive Briefing (TL;DR)</h4>
+                    <p className="text-xl md:text-2xl font-black text-white leading-tight italic">
+                      “{result.briefExplanation}”
+                    </p>
+                  </div>
+                </div>
+              </div>
               
               <div className="relative">
                 <div className="absolute -left-12 top-0 bottom-0 w-px bg-slate-100"></div>

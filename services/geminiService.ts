@@ -99,7 +99,6 @@ export async function analyzeSalesContext(filesContent: string, context: Meeting
         systemInstruction: `You are a world-class sales analyst. Ground everything in documentary proof. Be extremely precise and concise.`,
         responseMimeType: "application/json",
         responseSchema,
-        // Remove thinkingBudget for instant Flash execution
       },
     });
     
@@ -134,6 +133,7 @@ export async function performVisionOcr(base64Data: string, mimeType: string): Pr
 
 export interface CognitiveSearchResult {
   answer: string;
+  briefExplanation: string;
   citations: { snippet: string; source: string }[];
   reasoningChain: {
     painPoint: string;
@@ -150,19 +150,21 @@ export async function performCognitiveSearch(question: string, filesContent: str
   --- SOURCE DOCUMENTS ---
   ${filesContent}
   
-  Analyze and provide a strategic sales-focused answer grounded in the documents.`;
+  Analyze and provide a strategic sales-focused answer grounded in the documents. 
+  ALWAYS include a 'briefExplanation' which is a 2-sentence executive summary of the core tactical answer.`;
 
   try {
     const response = await ai.models.generateContent({
       model: modelName,
       contents: prompt,
       config: {
-        systemInstruction: `You are a Cognitive AI Sales Intelligence Agent. Focus on logical justification.`,
+        systemInstruction: `You are a Cognitive AI Sales Intelligence Agent. Focus on logical justification. Ground everything in documents.`,
         responseMimeType: "application/json",
         responseSchema: {
           type: Type.OBJECT,
           properties: {
             answer: { type: Type.STRING },
+            briefExplanation: { type: Type.STRING, description: "A high-density 2-sentence executive summary of the tactical answer." },
             citations: {
               type: Type.ARRAY,
               items: {
@@ -184,7 +186,7 @@ export async function performCognitiveSearch(question: string, filesContent: str
               required: ["painPoint", "capability", "strategicValue"]
             }
           },
-          required: ["answer", "citations", "reasoningChain"]
+          required: ["answer", "briefExplanation", "citations", "reasoningChain"]
         }
       }
     });
