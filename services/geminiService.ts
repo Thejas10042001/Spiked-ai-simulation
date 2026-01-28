@@ -52,43 +52,42 @@ export async function performCognitiveSearch(question: string, filesContent: str
   
   // Enforce the requested styles in the prompt
   const requestedStyles = context.answerStyles.length > 0 
-    ? `The user has specifically requested the following response components: ${context.answerStyles.join(', ')}.`
+    ? `The user has specifically requested the following strategic response components: ${context.answerStyles.join(', ')}.`
     : "Follow standard strategic consulting format.";
 
   const prompt = `MEETING DETAILS:
   Seller: ${context.sellerNames} at ${context.sellerCompany}
   Client: ${context.clientNames} at ${context.clientCompany}
   Focus: ${context.meetingFocus}
-  Strategic Keywords: ${context.strategicKeywords.join(', ')}
+  Solution Domain: ${context.productDomain}
   Snapshot: ${context.executiveSnapshot}
 
   TASK: Perform HIGH-FIDELITY COGNITIVE GROUNDING to answer the question using the source documents.
   
   ${requestedStyles}
 
-  FORMATTING RULES FOR THE "answer" STRING (CRITICAL):
+  FORMATTING RULES FOR THE "answer" STRING (MANDATORY):
   You must partition your answer into the following specific blocks. Be BRIEF but DEEP.
   
-  1. **CONCISE EXECUTIVE SUMMARY**
+  1. If "Concise Answer" or "Executive Summary" is active:
+     **CONCISE EXECUTIVE SUMMARY**
      [A high-impact, 2-3 sentence cognitive punch explaining the direct answer.]
 
-  2. **DEEP STRATEGIC ANALYSIS**
-     [Go beneath the surface. Analyze the buyer's UNSTATED MOTIVATIONS, hidden risks in the document structure, and the semantic patterns that suggest deal velocity or friction.]
+  2. If "Sales Points" or "Answer in Points" is active:
+     **SALES STRATEGY POINTS**
+     [Tactical, actionable bullet points for the salesperson to use in the meeting. Focus on value levers.]
 
-  3. **SALES STRATEGY POINTS**
-     [Tactical, actionable bullet points for the salesperson to use in the meeting.]
-
-  4. If "Define Technical Terms" is active, use:
+  3. If "Define Technical Terms" is active:
      **TECHNICAL GLOSSARY**
-     [Plain-English definitions for complex jargon found in the docs.]
+     [Plain-English definitions for complex jargon found in the docs, tailored to the ${context.persona} persona.]
 
-  5. If "Competitive Comparison" is active, use:
+  4. If "Competitive Comparison" is active:
      **COMPETITIVE LANDSCAPE**
-     [Explain our specific wedge against competitors based on document evidence.]
+     [Explain our specific wedge against competitors based on document evidence and the ${context.productDomain} domain.]
 
-  6. If "Anticipated Customer Questions" is active, use:
+  5. If "Anticipated Customer Questions" is active:
      **ANTICIPATED FRICTION**
-     [Prepare for the hard questions. Predict 2-3 objections based on document gaps.]
+     [Prepare for the hard questions. Predict 2-3 objections based on document gaps or identified risks.]
 
   STYLE RULES:
   - BOLD (**) critical keywords, revenue impacts, and names.
@@ -111,7 +110,7 @@ export async function performCognitiveSearch(question: string, filesContent: str
       model: modelName,
       contents: prompt,
       config: {
-        systemInstruction: `ACT AS: Avi from Spiked (Sales Strategy Expert). Target Persona: ${context.persona}. You are known for being concise yet providing extreme strategic depth.`,
+        systemInstruction: `ACT AS: Avi from Spiked (Sales Strategy Expert). Persona target: ${context.persona}. ${context.baseSystemPrompt}. You are famous for mapping specific document evidence to strategic sales wins.`,
         responseMimeType: "application/json",
         responseSchema: {
           type: Type.OBJECT,
@@ -349,7 +348,12 @@ export async function analyzeSalesContext(filesContent: string, context: Meeting
   };
 
   const systemInstruction = `You are a Cognitive AI Sales Intelligence Agent. 
-  Structure your response as JSON. Ensure all citations are grounded in the provided documents.`;
+  Target Persona: ${context.persona}.
+  Meeting Focus: ${context.meetingFocus}.
+  Seller Context: ${context.sellerNames} from ${context.sellerCompany}.
+  Solution: ${context.targetProducts} in ${context.productDomain}.
+
+  Structure your response as high-fidelity JSON. Analyze for unstated psychological drivers.`;
 
   const responseSchema = {
     type: Type.OBJECT,
@@ -407,14 +411,18 @@ export async function analyzeSalesContext(filesContent: string, context: Meeting
     required: ["snapshot", "documentInsights", "openingLines", "predictedQuestions", "strategicQuestionsToAsk", "objectionHandling", "toneGuidance", "finalCoaching"]
   };
 
-  const prompt = `Analyze: ${context.clientCompany}. Focus: ${context.meetingFocus}. --- DOCUMENTS --- ${filesContent}`;
+  const prompt = `Analyze current sales intelligence for: ${context.clientCompany}. 
+  Meeting Context: ${context.meetingFocus}.
+  Solution Context: ${context.targetProducts} (${context.productDomain}).
+  --- GROUNDING DOCUMENTS --- 
+  ${filesContent}`;
 
   try {
     const response = await ai.models.generateContent({
       model: modelName,
       contents: prompt,
       config: {
-        systemInstruction: `PERSONA: ${context.persona}. ${context.baseSystemPrompt}`,
+        systemInstruction: `${context.baseSystemPrompt}. Ensure all insights are strictly grounded in the provided document text.`,
         responseMimeType: "application/json",
         responseSchema,
         thinkingConfig: { thinkingBudget: 12000 }
