@@ -66,51 +66,47 @@ export async function performCognitiveSearch(question: string, filesContent: str
   
   ${requestedStyles}
 
-  FORMATTING RULES FOR THE "answer" STRING (MANDATORY):
-  You must partition your answer into the following specific blocks. Be BRIEF but DEEP.
+  FORMATTING RULES FOR THE "answer" STRING (CRITICAL):
+  You MUST use these exact block headers to structure the output. Bold the headers.
   
-  1. If "Concise Answer" or "Executive Summary" is active:
+  1. If "Concise Answer" is active:
      **CONCISE EXECUTIVE SUMMARY**
-     [A high-impact, 2-3 sentence cognitive punch explaining the direct answer.]
+     [A high-density, professional direct answer to the question.]
 
-  2. If "Sales Points" or "Answer in Points" is active:
+  2. If "Sales Points" is active:
      **SALES STRATEGY POINTS**
-     [Tactical, actionable bullet points for the salesperson to use in the meeting. Focus on value levers.]
+     [Bullet points of actionable conversation hooks and value levers.]
 
   3. If "Define Technical Terms" is active:
      **TECHNICAL GLOSSARY**
-     [Plain-English definitions for complex jargon found in the docs, tailored to the ${context.persona} persona.]
+     [Definitions of jargon from the docs, explained for a ${context.persona} persona.]
 
   4. If "Competitive Comparison" is active:
      **COMPETITIVE LANDSCAPE**
-     [Explain our specific wedge against competitors based on document evidence and the ${context.productDomain} domain.]
+     [Side-by-side logic of our wedge vs competitors based on document evidence.]
 
   5. If "Anticipated Customer Questions" is active:
      **ANTICIPATED FRICTION**
-     [Prepare for the hard questions. Predict 2-3 objections based on document gaps or identified risks.]
+     [Predict 2-3 tough questions this specific client will ask based on document gaps.]
 
   STYLE RULES:
-  - BOLD (**) critical keywords, revenue impacts, and names.
-  - ITALICIZE (*) nuanced observations and psychological inferences.
-  - Use high-density professional language.
+  - BOLD (**) critical data points and impact statements.
+  - ITALICIZE (*) psychological nuances.
+  - Tone: Strategic, Grounded, and Concise.
 
   QUESTION: ${question}
   
   --- SOURCE DOCUMENTS ---
   ${filesContent || "No documents uploaded yet."}
   
-  Return your response ONLY as a JSON object with:
-  - "answer": A comprehensive, beautifully formatted response using the specific section blocks requested.
-  - "briefExplanation": A single sentence executive summary (TL;DR).
-  - "citations": Array of { "snippet": string, "source": string }.
-  - "reasoningChain": { "painPoint": string, "capability": string, "strategicValue": string }`;
+  Return your response ONLY as a JSON object with the specified schema.`;
 
   try {
     const response = await ai.models.generateContent({
       model: modelName,
       contents: prompt,
       config: {
-        systemInstruction: `ACT AS: Avi from Spiked (Sales Strategy Expert). Persona target: ${context.persona}. ${context.baseSystemPrompt}. You are famous for mapping specific document evidence to strategic sales wins.`,
+        systemInstruction: `ACT AS: Avi from Spiked (Sales Strategy Expert). Persona: ${context.persona}. Use cognitive analysis to infer buyer psychology from document evidence.`,
         responseMimeType: "application/json",
         responseSchema: {
           type: Type.OBJECT,
@@ -154,6 +150,7 @@ export async function performCognitiveSearch(question: string, filesContent: str
   }
 }
 
+// ... Rest of the existing geminiService exports ...
 export async function generateDynamicSuggestions(filesContent: string, context: MeetingContext): Promise<string[]> {
   const modelName = 'gemini-3-flash-preview';
   const prompt = `Based on the following meeting context and source documents, suggest 3 highly strategic and nuanced questions that a salesperson should ask our AI to uncover value mapping or deal friction.
