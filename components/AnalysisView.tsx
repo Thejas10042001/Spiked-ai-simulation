@@ -1,40 +1,12 @@
-import React, { useState, useRef, useMemo, useEffect } from 'react';
-import { AnalysisResult, Citation, UploadedFile, BuyerSnapshot, OpeningLine, DocumentSummary, ObjectionPair, CompetitorInsight } from '../types';
+import React, { useState, useRef, useMemo } from 'react';
+import { AnalysisResult, Citation, UploadedFile, BuyerSnapshot, ObjectionPair } from '../types';
 import { ICONS } from '../constants';
 import { generatePitchAudio, decodeAudioData } from '../services/geminiService';
-
-declare global {
-  interface Window {
-    jspdf: any;
-  }
-}
 
 interface AnalysisViewProps {
   result: AnalysisResult;
   files: UploadedFile[];
 }
-
-const getPriorityTheme = (text: string) => {
-  const lower = (text || "").toLowerCase();
-  if (lower.includes('growth') || lower.includes('revenue') || lower.includes('scale')) 
-    return { icon: <ICONS.Growth />, color: 'emerald', label: 'Expansion' };
-  if (lower.includes('effic') || lower.includes('speed') || lower.includes('cost') || lower.includes('process')) 
-    return { icon: <ICONS.Efficiency />, color: 'blue', label: 'Optimization' };
-  if (lower.includes('risk') || lower.includes('secu') || lower.includes('compli') || lower.includes('safe')) 
-    return { icon: <ICONS.Security />, color: 'amber', label: 'Protection' };
-  if (lower.includes('roi') || lower.includes('profit') || lower.includes('margin') || lower.includes('value')) 
-    return { icon: <ICONS.ROI />, color: 'rose', label: 'Yield' };
-  if (lower.includes('innov') || lower.includes('future') || lower.includes('new') || lower.includes('transform')) 
-    return { icon: <ICONS.Innovation />, color: 'indigo', label: 'Evolution' };
-  return { icon: <ICONS.Trophy />, color: 'slate', label: 'Objective' };
-};
-
-const parseIntensity = (str: string, highKeys: string[], lowKeys: string[]) => {
-  const s = (str || "").toLowerCase();
-  if (highKeys.some(k => s.includes(k))) return 85 + Math.random() * 10;
-  if (lowKeys.some(k => s.includes(k))) return 25 + Math.random() * 15;
-  return 55 + Math.random() * 10;
-};
 
 const getArchetype = (snapshot: BuyerSnapshot) => {
   const risk = (snapshot.riskTolerance || "").toLowerCase();
@@ -50,18 +22,21 @@ const getArchetype = (snapshot: BuyerSnapshot) => {
   return { title: "The Pragmatic Orchestrator", desc: "Balanced approach focused on operational stability and peer consensus." };
 };
 
+const parseIntensity = (str: string, highKeys: string[], lowKeys: string[]) => {
+  const s = (str || "").toLowerCase();
+  if (highKeys.some(k => s.includes(k))) return 85 + Math.random() * 10;
+  if (lowKeys.some(k => s.includes(k))) return 25 + Math.random() * 15;
+  return 55 + Math.random() * 10;
+};
+
 export const AnalysisView: React.FC<AnalysisViewProps> = ({ result, files }) => {
   const [highlightedSnippet, setHighlightedSnippet] = useState<string | null>(null);
-  const [activeGroundingId, setActiveGroundingId] = useState<string | null>(null);
   const [expandedObjections, setExpandedObjections] = useState<Set<number>>(new Set([0]));
-  const [copiedIndex, setCopiedIndex] = useState<number | null>(null);
-  const [copiedObjectionIndex, setCopiedObjectionIndex] = useState<number | null>(null);
   const [playingAudioId, setPlayingAudioId] = useState<string | null>(null);
-  const [isExporting, setIsExporting] = useState(false);
+  const [copiedId, setCopiedId] = useState<number | null>(null);
   
   const audioContextRef = useRef<AudioContext | null>(null);
   const audioSourceRef = useRef<AudioBufferSourceNode | null>(null);
-  const analysisRef = useRef<HTMLDivElement>(null);
 
   const archetype = useMemo(() => getArchetype(result.snapshot), [result.snapshot]);
 
@@ -76,61 +51,30 @@ export const AnalysisView: React.FC<AnalysisViewProps> = ({ result, files }) => 
     add(result.snapshot.riskToleranceCitation, "Risk Tolerance", "snapshot-risk", "Trait");
     
     (result.snapshot.priorities || []).forEach((p, i) => add(p.citation, `Priority: ${p.text}`, `priority-${i}`, "Strategic"));
-    (result.snapshot.likelyObjections || []).forEach((o, i) => add(o.citation, `Objection: ${o.text}`, `objection-snap-${i}`, "Psychological"));
     (result.competitiveComparison || []).forEach((c, i) => add(c.citation, `Competitor: ${c.name}`, `competitor-${i}`, "Competitive"));
-    (result.openingLines || []).forEach((ol, i) => add(ol.citation, `Opener: ${ol.text}`, `opener-${i}`, "Conversation"));
-    (result.predictedQuestions || []).forEach((q, i) => add(q.citation, `Question: ${q.customerAsks}`, `predicted-q-${i}`, "Dialogue"));
-    (result.strategicQuestionsToAsk || []).forEach((s, i) => add(s.citation, `Discovery Q: ${s.question}`, `strategic-q-${i}`, "Dialogue"));
-    (result.objectionHandling || []).forEach((o, i) => add(o.citation, `Counter: ${o.objection}`, `objection-handle-${i}`, "Tactical"));
+    (result.objectionHandling || []).forEach((o, i) => add(o.citation, `Objection: ${o.objection}`, `objection-${i}`, "Tactical"));
     
-    (result.documentInsights.entities || []).forEach((ent, i) => {
-      add(ent.citation, `${ent.type}: ${ent.name}`, `entity-${i}`, "Entity");
-    });
-
     return list;
   }, [result]);
+
+  const toggleObjection = (idx: number) => {
+    const next = new Set(expandedObjections);
+    if (next.has(idx)) next.delete(idx);
+    else next.add(idx);
+    setExpandedObjections(next);
+  };
+
+  const copyToClipboard = (text: string, idx: number) => {
+    navigator.clipboard.writeText(text);
+    setCopiedId(idx);
+    setTimeout(() => setCopiedId(null), 2000);
+  };
 
   const scrollToSource = (citation: Citation) => {
     if (!citation?.snippet) return;
     setHighlightedSnippet(citation.snippet);
     const explorer = document.getElementById('grounding-explorer');
     if (explorer) explorer.scrollIntoView({ behavior: 'smooth', block: 'start' });
-    
-    setTimeout(() => {
-      const marks = document.querySelectorAll(`mark[data-snippet]`);
-      for (const m of Array.from(marks)) {
-        if (m.textContent?.trim() === citation.snippet.trim()) {
-          m.scrollIntoView({ behavior: 'smooth', block: 'center' });
-          const el = m as HTMLElement;
-          document.querySelectorAll('.grounding-active').forEach(e => e.classList.remove('grounding-active'));
-          el.classList.add('grounding-active');
-          setActiveGroundingId(citation.snippet);
-          setTimeout(() => { 
-            el.classList.remove('grounding-active');
-            setActiveGroundingId(null);
-          }, 5000);
-          break;
-        }
-      }
-    }, 400);
-  };
-
-  const GroundingButton = ({ citation, active, color = "indigo" }: { citation: Citation, active: boolean, color?: "indigo" | "rose" | "slate" }) => {
-    const colorClasses = {
-      indigo: active ? "bg-indigo-600 text-white border-indigo-600 shadow-indigo-200" : "bg-white text-indigo-600 border-indigo-200 hover:bg-indigo-600 hover:text-white hover:border-indigo-600",
-      rose: active ? "bg-rose-600 text-white border-rose-600 shadow-rose-200" : "bg-white text-rose-600 border-rose-200 hover:bg-rose-600 hover:text-white hover:border-rose-600",
-      slate: active ? "bg-slate-700 text-white border-slate-700 shadow-slate-200" : "bg-white text-slate-500 border-slate-200 hover:bg-slate-700 hover:text-white hover:border-slate-700"
-    };
-
-    return (
-      <button 
-        onClick={(e) => { e.stopPropagation(); scrollToSource(citation); }}
-        className={`group relative inline-flex items-center gap-2.5 px-5 py-2 rounded-full text-[11px] font-black uppercase tracking-widest border transition-all duration-300 shadow-sm ${colorClasses[color]} ${active ? 'scale-105 ring-2 ring-offset-2 ring-indigo-400' : 'hover:-translate-y-0.5 active:scale-95'}`}
-      >
-        <div className={`transition-transform duration-500 ${active ? 'animate-spin' : 'group-hover:rotate-12'}`}><ICONS.Shield /></div>
-        <span>{active ? "Evidence Active" : "Inspect Grounding"}</span>
-      </button>
-    );
   };
 
   const playSnippet = async (text: string, id: string) => {
@@ -160,22 +104,10 @@ export const AnalysisView: React.FC<AnalysisViewProps> = ({ result, files }) => 
   };
 
   return (
-    <div className="relative space-y-12 animate-in fade-in slide-in-from-bottom-4 duration-700 pb-20" ref={analysisRef}>
+    <div className="relative space-y-12 animate-in fade-in slide-in-from-bottom-4 duration-700 pb-20">
       
-      {/* ACTION BAR */}
-      <div className="flex justify-end">
-        <button
-          onClick={() => {}} // Download functionality removed for brevity in this specific update
-          disabled={isExporting}
-          className="flex items-center gap-2 px-6 py-3 bg-white border border-slate-200 rounded-2xl font-bold text-slate-700 hover:bg-indigo-50 hover:text-indigo-600 hover:border-indigo-200 transition-all shadow-sm group"
-        >
-          <ICONS.Document />
-          <span>Strategy Report Active</span>
-        </button>
-      </div>
-
       {/* COGNITIVE PROFILE DASHBOARD */}
-      <section className="bg-white rounded-[4rem] p-12 shadow-2xl border border-slate-200 relative overflow-hidden group/snap">
+      <section className="bg-white rounded-[4rem] p-12 shadow-2xl border border-slate-200 relative overflow-hidden">
         <div className="absolute top-0 right-0 p-12 opacity-5"><ICONS.Brain className="w-48 h-48 text-indigo-900" /></div>
         <div className="relative z-10 flex flex-col xl:flex-row gap-16 items-start">
           <div className="w-full xl:w-[400px] space-y-10">
@@ -201,7 +133,105 @@ export const AnalysisView: React.FC<AnalysisViewProps> = ({ result, files }) => 
         </div>
       </section>
 
-      {/* COMPETITIVE COMPARISON SECTION - ENHANCED FORMATTING */}
+      {/* OBJECTION HANDLING BATTLE-DRILL (INTERACTIVE) */}
+      <section className="bg-white rounded-[3rem] p-10 shadow-2xl border border-slate-200">
+        <div className="flex items-center gap-4 mb-10">
+          <div className="p-4 bg-indigo-600 text-white rounded-2xl shadow-xl shadow-indigo-100">
+            <ICONS.Security />
+          </div>
+          <div>
+            <h2 className="text-2xl font-black text-slate-800 tracking-tight">Objection Battle-Drill</h2>
+            <p className="text-sm text-slate-500 font-medium">Click to deconstruct psychological barriers and view articular counters.</p>
+          </div>
+        </div>
+
+        <div className="space-y-4">
+          {(result.objectionHandling || []).map((obj, idx) => {
+            const isExpanded = expandedObjections.has(idx);
+            return (
+              <div key={idx} className={`rounded-[2.5rem] border transition-all duration-500 overflow-hidden ${isExpanded ? 'bg-slate-50 border-indigo-200 shadow-xl' : 'bg-white border-slate-100 hover:border-slate-300 shadow-sm'}`}>
+                <button 
+                  onClick={() => toggleObjection(idx)}
+                  className="w-full text-left px-10 py-8 flex items-center justify-between group"
+                >
+                  <div className="flex items-center gap-6 flex-1">
+                    <div className={`w-10 h-10 rounded-full flex items-center justify-center font-black text-sm transition-colors ${isExpanded ? 'bg-indigo-600 text-white' : 'bg-slate-100 text-slate-400 group-hover:bg-slate-200'}`}>
+                      {idx + 1}
+                    </div>
+                    <span className="text-xl font-black text-slate-800 tracking-tight">{obj.objection}</span>
+                  </div>
+                  <div className={`transition-transform duration-500 ${isExpanded ? 'rotate-180' : ''}`}>
+                    <svg xmlns="http://www.w3.org/2000/svg" className="w-6 h-6 text-slate-400" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={3} d="M19 9l-7 7-7-7" />
+                    </svg>
+                  </div>
+                </button>
+
+                {isExpanded && (
+                  <div className="px-10 pb-10 pt-2 animate-in slide-in-from-top-4 duration-300">
+                    <div className="grid grid-cols-1 lg:grid-cols-2 gap-10">
+                      <div className="space-y-8">
+                        <div>
+                          <h4 className="text-[10px] font-black uppercase tracking-widest text-rose-500 mb-3 flex items-center gap-2">
+                            <ICONS.Brain className="w-4 h-4" /> The "Hidden" Meaning
+                          </h4>
+                          <p className="text-lg text-slate-700 font-medium italic leading-relaxed border-l-4 border-rose-100 pl-6">
+                            “{obj.realMeaning}”
+                          </p>
+                        </div>
+                        <div>
+                          <h4 className="text-[10px] font-black uppercase tracking-widest text-indigo-500 mb-3 flex items-center gap-2">
+                            <ICONS.Trophy className="w-4 h-4" /> Strategic Response Path
+                          </h4>
+                          <p className="text-sm text-slate-600 leading-relaxed font-medium">
+                            {obj.strategy}
+                          </p>
+                        </div>
+                        <div className="pt-4 flex items-center gap-4">
+                          <button 
+                            onClick={() => scrollToSource(obj.citation)}
+                            className="inline-flex items-center gap-2 px-4 py-2 rounded-full text-[9px] font-black uppercase tracking-widest bg-white border border-slate-200 text-slate-400 hover:text-indigo-600 hover:border-indigo-200 transition-all shadow-sm"
+                          >
+                            <ICONS.Shield className="w-3 h-3" /> Grounding Evidence
+                          </button>
+                        </div>
+                      </div>
+
+                      <div className="relative">
+                        <div className="bg-slate-900 rounded-[2.5rem] p-8 shadow-2xl relative overflow-hidden h-full flex flex-col justify-between">
+                          <div className="absolute top-0 right-0 p-8 opacity-10"><ICONS.Speaker className="w-24 h-24 text-white" /></div>
+                          <div className="relative z-10 space-y-4">
+                            <h4 className="text-[9px] font-black uppercase tracking-[0.3em] text-indigo-400">Verbatim Articular Script</h4>
+                            <p className="text-xl font-black italic leading-tight text-white tracking-tight">
+                              “{obj.exactWording}”
+                            </p>
+                          </div>
+                          <div className="relative z-10 pt-8 flex items-center gap-3">
+                            <button 
+                              onClick={() => playSnippet(obj.exactWording, `obj-audio-${idx}`)}
+                              className={`flex-1 flex items-center justify-center gap-2 py-3 rounded-xl font-black text-[10px] uppercase tracking-widest transition-all ${playingAudioId === `obj-audio-${idx}` ? 'bg-rose-600 text-white' : 'bg-white text-slate-900 hover:bg-indigo-50'}`}
+                            >
+                              {playingAudioId === `obj-audio-${idx}` ? <><div className="w-2 h-2 bg-white rounded-full animate-ping"></div> Stop Audio</> : <><ICONS.Play className="w-3 h-3" /> Play Pitch</>}
+                            </button>
+                            <button 
+                              onClick={() => copyToClipboard(obj.exactWording, idx)}
+                              className={`px-5 py-3 rounded-xl font-black text-[10px] uppercase tracking-widest transition-all border ${copiedId === idx ? 'bg-emerald-500 border-emerald-500 text-white' : 'bg-slate-800 border-slate-700 text-slate-400 hover:text-white hover:border-slate-500'}`}
+                            >
+                              {copiedId === idx ? 'Copied' : 'Copy'}
+                            </button>
+                          </div>
+                        </div>
+                      </div>
+                    </div>
+                  </div>
+                )}
+              </div>
+            );
+          })}
+        </div>
+      </section>
+
+      {/* COMPETITIVE COMPARISON SECTION */}
       {result.competitiveComparison && result.competitiveComparison.length > 0 && (
         <section className="bg-white rounded-[3rem] p-10 shadow-2xl border border-slate-200">
           <div className="flex items-center gap-4 mb-10">
@@ -225,10 +255,9 @@ export const AnalysisView: React.FC<AnalysisViewProps> = ({ result, files }) => 
                 >
                   <div className="flex flex-col md:flex-row justify-between items-start md:items-center gap-6 mb-8 border-b border-slate-200/60 pb-8">
                     <div>
-                      <h3 className="text-3xl font-black text-slate-900 tracking-tight uppercase">**{comp.name}**</h3>
+                      <h3 className="text-3xl font-black text-slate-900 tracking-tight uppercase">{comp.name}</h3>
                       <p className="text-rose-600 text-[10px] font-black uppercase tracking-[0.3em] mt-1 italic">*Direct/Indirect Threat Profile*</p>
                     </div>
-                    <GroundingButton citation={comp.citation} active={isGrounded} color="rose" />
                   </div>
 
                   <div className="space-y-8">
@@ -278,7 +307,6 @@ export const AnalysisView: React.FC<AnalysisViewProps> = ({ result, files }) => 
                         <p className="text-2xl font-black italic leading-tight text-white tracking-tight">
                           “{comp.ourWedge}”
                         </p>
-                        <p className="text-indigo-400 text-[10px] font-bold uppercase tracking-widest pt-2">Weaponized Differentiation Hook</p>
                       </div>
                     </div>
                   </div>
@@ -325,7 +353,7 @@ export const AnalysisView: React.FC<AnalysisViewProps> = ({ result, files }) => 
             {files.map((file, i) => (
               <div key={i} className="mb-12">
                 <h5 className="text-[10px] font-black text-indigo-400 uppercase tracking-widest mb-4 sticky top-0 bg-white py-2">{file.name}</h5>
-                <DocumentHighlighter text={file.content} citations={allCitations.filter(c => c.sourceFile === file.name)} highlightedSnippet={highlightedSnippet} onHighlightClick={() => {}} />
+                <DocumentHighlighter text={file.content} citations={allCitations.filter(c => c.sourceFile === file.name)} highlightedSnippet={highlightedSnippet} />
               </div>
             ))}
           </div>
@@ -353,28 +381,23 @@ const IntensityBar = ({ label, value, color }: { label: string, value: number, c
   </div>
 );
 
-const DocumentHighlighter = ({ text, citations, highlightedSnippet, onHighlightClick }: { 
+const DocumentHighlighter = ({ text, citations, highlightedSnippet }: { 
   text: string; 
   citations: (Citation & { id: string })[]; 
   highlightedSnippet: string | null;
-  onHighlightClick: (id: string) => void;
 }) => {
   if (!citations || !citations.length) return <>{text}</>;
-  const sortedCitations = [...citations].sort((a, b) => (b.snippet?.length || 0) - (a.snippet?.length || 0));
   let parts: React.ReactNode[] = [text];
-  sortedCitations.forEach((cit) => {
+  citations.forEach((cit) => {
     if (!cit.snippet) return;
     const newParts: React.ReactNode[] = [];
     parts.forEach((part) => {
       if (typeof part !== 'string') { newParts.push(part); return; }
-      const snippet = cit.snippet.trim();
-      const index = part.indexOf(snippet);
+      const index = part.indexOf(cit.snippet);
       if (index === -1) { newParts.push(part); } else {
-        const before = part.slice(0, index);
-        const after = part.slice(index + snippet.length);
-        if (before) newParts.push(before);
-        newParts.push(<mark key={`${cit.id}-${index}`} className={`cursor-pointer transition-all ${highlightedSnippet === cit.snippet ? 'grounding-active' : 'bg-indigo-50 text-indigo-700'}`}>{snippet}</mark>);
-        if (after) newParts.push(after);
+        newParts.push(part.slice(0, index));
+        newParts.push(<mark key={cit.id} className={`cursor-pointer transition-all ${highlightedSnippet === cit.snippet ? 'grounding-active' : 'bg-indigo-50 text-indigo-700'}`}>{cit.snippet}</mark>);
+        newParts.push(part.slice(index + cit.snippet.length));
       }
     });
     parts = newParts;
