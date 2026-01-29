@@ -167,10 +167,10 @@ const App: React.FC = () => {
             <div className="flex flex-col md:flex-row md:items-center justify-between gap-6 bg-white px-8 py-4 rounded-[2.5rem] shadow-xl border border-slate-100">
               <div className="flex items-center gap-2 overflow-x-auto no-scrollbar py-2">
                 <TabBtn active={activeTab === 'strategy'} onClick={() => setActiveTab('strategy')} icon={<ICONS.Document />} label="Brief" />
-                <TabBtn active={activeTab === 'search'} onClick={() => setActiveTab('search'} icon={<ICONS.Search />} label="Intelligence" />
-                <TabBtn active={activeTab === 'audio'} onClick={() => setActiveTab('audio'} icon={<ICONS.Speaker />} label="Audio" />
-                <TabBtn active={activeTab === 'practice'} onClick={() => setActiveTab('practice'} icon={<ICONS.Chat />} label="Live" />
-                <TabBtn active={activeTab === 'context'} onClick={() => setActiveTab('context'} icon={<ICONS.Efficiency />} label="Config" />
+                <TabBtn active={activeTab === 'search'} onClick={() => setActiveTab('search')} icon={<ICONS.Search />} label="Intelligence" />
+                <TabBtn active={activeTab === 'audio'} onClick={() => setActiveTab('audio')} icon={<ICONS.Speaker />} label="Audio" />
+                <TabBtn active={activeTab === 'practice'} onClick={() => setActiveTab('practice')} icon={<ICONS.Chat />} label="Live" />
+                <TabBtn active={activeTab === 'context'} onClick={() => setActiveTab('context')} icon={<ICONS.Efficiency />} label="Config" />
               </div>
               <div className="flex items-center gap-4">
                  <div className="flex items-center gap-2 px-4 py-2 bg-emerald-50 text-emerald-600 rounded-full border border-emerald-100">
