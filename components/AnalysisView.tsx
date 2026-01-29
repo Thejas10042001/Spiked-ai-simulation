@@ -1,3 +1,4 @@
+
 import React, { useState, useRef, useMemo, useEffect } from 'react';
 import { AnalysisResult, Citation, UploadedFile, BuyerSnapshot, OpeningLine, DocumentSummary, ObjectionPair } from '../types';
 import { ICONS } from '../constants';
@@ -89,7 +90,6 @@ export const AnalysisView: React.FC<AnalysisViewProps> = ({ result, files }) => 
     return list;
   }, [result]);
 
-  // Effect to handle objection expansion when evidence is inspected
   useEffect(() => {
     if (highlightedSnippet) {
       (result.objectionHandling || []).forEach((obj, i) => {
@@ -176,12 +176,40 @@ export const AnalysisView: React.FC<AnalysisViewProps> = ({ result, files }) => 
       addSectionHeading("Core Priorities");
       (result.snapshot.priorities || []).forEach(p => addText(`• ${p.text}`, 11));
 
+      addSectionHeading("Document Insights & Summaries");
+      (result.documentInsights.summaries || []).forEach(summary => {
+        addText(`SOURCE: ${summary.fileName}`, 11, 'bold');
+        addText(`STRATEGIC IMPACT: ${summary.strategicImpact}`, 10, 'bold', [79, 70, 229]);
+        addText(summary.summary, 10, 'normal', [71, 85, 105]);
+        summary.criticalInsights.forEach(insight => addText(`  - ${insight}`, 10, 'italic'));
+        y += 8;
+      });
+
+      addSectionHeading("Objection Handling");
+      (result.objectionHandling || []).forEach(obj => {
+        addText(`OBJECTION: "${obj.objection}"`, 11, 'bold', [225, 29, 72]); // Rose 600
+        addText(`SUBTEXT: ${obj.realMeaning}`, 10, 'italic');
+        addText(`STRATEGY: ${obj.strategy}`, 10);
+        addText(`BATTLE-READY WORDING: "${obj.exactWording}"`, 11, 'bold', [79, 70, 229]);
+        y += 8;
+      });
+
       addSectionHeading("Discovery Questions");
       (result.strategicQuestionsToAsk || []).forEach(sq => {
         addText(`QUESTION: "${sq.question}"`, 11, 'bold');
         addText(`STRATEGIC INTENT: ${sq.whyItMatters}`, 10, 'italic', [100, 116, 139]);
         y += 5;
       });
+
+      addSectionHeading("Final Sales Coaching");
+      addText("DOS:", 10, 'bold', [16, 185, 129]); // Emerald 500
+      (result.finalCoaching.dos || []).forEach(d => addText(`• ${d}`, 10));
+      y += 5;
+      addText("DON'TS:", 10, 'bold', [244, 63, 94]); // Rose 500
+      (result.finalCoaching.donts || []).forEach(d => addText(`• ${d}`, 10));
+      y += 5;
+      addText("FINAL ADVICE:", 10, 'bold');
+      addText(result.finalCoaching.finalAdvice, 10, 'italic');
 
       drawFooter();
       doc.save(`Sales_Brief_${result.snapshot.role.replace(/\s+/g, '_')}.pdf`);
@@ -415,6 +443,7 @@ export const AnalysisView: React.FC<AnalysisViewProps> = ({ result, files }) => 
                    <p className="text-sm font-bold text-slate-900 leading-relaxed italic border-l-2 border-indigo-200 pl-4">“{summary.strategicImpact}”</p>
                 </div>
                 <div className="pt-4 border-t border-slate-200/50">
+                   <p className="text-[10px] font-black text-slate-400 uppercase tracking-widest mb-3">Critical Insights</p>
                    <ul className="space-y-2">
                      {(summary.criticalInsights || []).map((insight, i) => (
                        <li key={i} className="flex gap-3 text-xs text-slate-700 font-medium">
@@ -423,6 +452,10 @@ export const AnalysisView: React.FC<AnalysisViewProps> = ({ result, files }) => 
                        </li>
                      ))}
                    </ul>
+                </div>
+                <div className="pt-4 border-t border-slate-200/50">
+                   <p className="text-[10px] font-black text-slate-400 uppercase tracking-widest mb-2">Executive Overview</p>
+                   <p className="text-xs text-slate-500 leading-relaxed">{summary.summary}</p>
                 </div>
               </div>
             ))}

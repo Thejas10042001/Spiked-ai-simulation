@@ -150,7 +150,6 @@ export async function performCognitiveSearch(question: string, filesContent: str
   }
 }
 
-// ... Rest of the existing geminiService exports ...
 export async function generateDynamicSuggestions(filesContent: string, context: MeetingContext): Promise<string[]> {
   const modelName = 'gemini-3-flash-preview';
   const prompt = `Based on the following meeting context and source documents, suggest 3 highly strategic and nuanced questions that a salesperson should ask our AI to uncover value mapping or deal friction.
@@ -344,14 +343,6 @@ export async function analyzeSalesContext(filesContent: string, context: Meeting
     required: ["snippet", "sourceFile"],
   };
 
-  const systemInstruction = `You are a Cognitive AI Sales Intelligence Agent. 
-  Target Persona: ${context.persona}.
-  Meeting Focus: ${context.meetingFocus}.
-  Seller Context: ${context.sellerNames} from ${context.sellerCompany}.
-  Solution: ${context.targetProducts} in ${context.productDomain}.
-
-  Structure your response as high-fidelity JSON. Analyze for unstated psychological drivers.`;
-
   const responseSchema = {
     type: Type.OBJECT,
     properties: {
@@ -381,9 +372,9 @@ export async function analyzeSalesContext(filesContent: string, context: Meeting
               type: Type.OBJECT,
               properties: {
                 fileName: { type: Type.STRING },
-                summary: { type: Type.STRING },
-                strategicImpact: { type: Type.STRING },
-                criticalInsights: { type: Type.ARRAY, items: { type: Type.STRING } }
+                summary: { type: Type.STRING, description: "Highly concise executive summary focused ONLY on sales-relevant themes." },
+                strategicImpact: { type: Type.STRING, description: "One sentence on how this specific document changes the sales approach." },
+                criticalInsights: { type: Type.ARRAY, items: { type: Type.STRING }, description: "Max 3-5 high-impact bullet points of critical intel." }
               },
               required: ["fileName", "summary", "strategicImpact", "criticalInsights"]
             }
@@ -408,9 +399,17 @@ export async function analyzeSalesContext(filesContent: string, context: Meeting
     required: ["snapshot", "documentInsights", "openingLines", "predictedQuestions", "strategicQuestionsToAsk", "objectionHandling", "toneGuidance", "finalCoaching"]
   };
 
-  const prompt = `Analyze current sales intelligence for: ${context.clientCompany}. 
+  const prompt = `Perform a high-fidelity sales intelligence analysis for: ${context.clientCompany}. 
   Meeting Context: ${context.meetingFocus}.
-  Solution Context: ${context.targetProducts} (${context.productDomain}).
+  Solution Domain: ${context.productDomain}.
+  
+  TASK: Synthesize the provided documents into a strategic weapon.
+  ENHANCED SUMMARIZATION RULES:
+  1. For the "summaries" field, do NOT provide generic summaries. 
+  2. Focus exclusively on identifying: Unstated budget signals, Technical bottlenecks, Strategic priorities, and Decision-maker influence.
+  3. Keep the "summary" string under 300 characters.
+  4. Ensure "strategicImpact" is a single, hard-hitting sentence for the salesperson.
+
   --- GROUNDING DOCUMENTS --- 
   ${filesContent}`;
 
@@ -419,7 +418,7 @@ export async function analyzeSalesContext(filesContent: string, context: Meeting
       model: modelName,
       contents: prompt,
       config: {
-        systemInstruction: `${context.baseSystemPrompt}. Ensure all insights are strictly grounded in the provided document text.`,
+        systemInstruction: `You are a Cognitive AI Sales Intelligence Agent. Persona: ${context.persona}. Target Solution: ${context.targetProducts}. ${context.baseSystemPrompt}. Ground every insight in document text.`,
         responseMimeType: "application/json",
         responseSchema,
         thinkingConfig: { thinkingBudget: 12000 }
