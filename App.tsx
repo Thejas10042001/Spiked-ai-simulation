@@ -30,7 +30,14 @@ const App: React.FC = () => {
     productDomain: "",
     meetingFocus: "",
     persona: "Balanced",
-    answerStyles: [],
+    // Making requested styles default
+    answerStyles: [
+      "Sales Points", 
+      "Key Statistics", 
+      "Competitive Comparison", 
+      "Anticipated Customer Questions", 
+      "Pricing Overview"
+    ],
     executiveSnapshot: "",
     strategicKeywords: [],
     baseSystemPrompt: ""

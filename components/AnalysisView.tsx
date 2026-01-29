@@ -1,4 +1,3 @@
-
 import React, { useState, useRef, useMemo, useEffect } from 'react';
 import { AnalysisResult, Citation, UploadedFile, BuyerSnapshot, OpeningLine, DocumentSummary, ObjectionPair, CompetitorInsight } from '../types';
 import { ICONS } from '../constants';
@@ -202,7 +201,7 @@ export const AnalysisView: React.FC<AnalysisViewProps> = ({ result, files }) => 
         </div>
       </section>
 
-      {/* COMPETITIVE COMPARISON SECTION */}
+      {/* COMPETITIVE COMPARISON SECTION - ENHANCED FORMATTING */}
       {result.competitiveComparison && result.competitiveComparison.length > 0 && (
         <section className="bg-white rounded-[3rem] p-10 shadow-2xl border border-slate-200">
           <div className="flex items-center gap-4 mb-10">
@@ -210,60 +209,77 @@ export const AnalysisView: React.FC<AnalysisViewProps> = ({ result, files }) => 
                 <ICONS.Search />
              </div>
              <div>
-               <h2 className="text-2xl font-bold text-slate-800 tracking-tight">Competitive Intelligence Engine</h2>
-               <p className="text-sm text-slate-500 font-medium">Analyzing threats and differentiation hooks detected in persistent memory.</p>
+               <h2 className="text-2xl font-black text-slate-800 tracking-tight">Competitive Intelligence Hub</h2>
+               <p className="text-sm text-slate-500 font-medium">Deep-dive into inferred and explicit competitive dynamics.</p>
              </div>
           </div>
 
-          <div className="space-y-8">
+          <div className="space-y-12">
             {result.competitiveComparison.map((comp, idx) => {
               const isGrounded = highlightedSnippet === comp.citation?.snippet;
               return (
                 <div 
                   key={idx} 
                   id={`competitor-${idx}`}
-                  className={`p-10 rounded-[2.5rem] border transition-all duration-500 ${isGrounded ? 'bg-rose-50 border-rose-400 ring-4 ring-rose-100' : 'bg-slate-50 border-slate-100'}`}
+                  className={`p-10 rounded-[3rem] border transition-all duration-500 ${isGrounded ? 'bg-rose-50 border-rose-400 ring-8 ring-rose-50' : 'bg-slate-50 border-slate-100'}`}
                 >
-                  <div className="flex flex-col md:flex-row justify-between items-start md:items-center gap-6 mb-8">
+                  <div className="flex flex-col md:flex-row justify-between items-start md:items-center gap-6 mb-8 border-b border-slate-200/60 pb-8">
                     <div>
-                      <h3 className="text-2xl font-black text-slate-900 mb-1">**{comp.name}**</h3>
-                      <p className="text-slate-500 font-medium italic">*Competitor Landscape Overview*</p>
+                      <h3 className="text-3xl font-black text-slate-900 tracking-tight uppercase">**{comp.name}**</h3>
+                      <p className="text-rose-600 text-[10px] font-black uppercase tracking-[0.3em] mt-1 italic">*Direct/Indirect Threat Profile*</p>
                     </div>
                     <GroundingButton citation={comp.citation} active={isGrounded} color="rose" />
                   </div>
 
-                  <p className="text-slate-700 leading-relaxed mb-8 font-medium">
-                    {comp.overview}
-                  </p>
-
-                  <div className="grid grid-cols-1 md:grid-cols-2 gap-8 mb-8">
-                    <div className="space-y-4">
-                      <h4 className="text-sm font-black uppercase tracking-widest text-emerald-600">**Strengths Detected**</h4>
-                      <ul className="space-y-2">
-                        {comp.strengths.map((s, i) => (
-                          <li key={i} className="flex gap-2 text-sm text-slate-600 italic">
-                            <span className="text-emerald-400">●</span> {s}
-                          </li>
-                        ))}
-                      </ul>
+                  <div className="space-y-8">
+                    <div>
+                      <h4 className="text-xs font-black uppercase tracking-widest text-slate-400 mb-3">**Competitor Overview**</h4>
+                      <p className="text-lg text-slate-700 leading-relaxed font-medium italic">
+                        "{comp.overview}"
+                      </p>
                     </div>
-                    <div className="space-y-4">
-                      <h4 className="text-sm font-black uppercase tracking-widest text-rose-600">**Vulnerabilities & Weaknesses**</h4>
-                      <ul className="space-y-2">
-                        {comp.weaknesses.map((w, i) => (
-                          <li key={i} className="flex gap-2 text-sm text-slate-600 italic">
-                            <span className="text-rose-400">●</span> {w}
-                          </li>
-                        ))}
-                      </ul>
-                    </div>
-                  </div>
 
-                  <div className="bg-indigo-600 text-white rounded-[2rem] p-8 shadow-2xl relative overflow-hidden group">
-                    <div className="absolute top-0 right-0 p-8 opacity-10 group-hover:rotate-12 transition-transform"><ICONS.Trophy className="w-16 h-16" /></div>
-                    <div className="relative z-10">
-                      <h4 className="text-[10px] font-black uppercase tracking-[0.3em] mb-3 text-indigo-200">**Strategic Differentiation: Our Wedge**</h4>
-                      <p className="text-xl font-bold italic leading-relaxed">“{comp.ourWedge}”</p>
+                    <div className="grid grid-cols-1 md:grid-cols-2 gap-10">
+                      <div className="space-y-4">
+                        <h4 className="text-[11px] font-black uppercase tracking-widest text-emerald-600 flex items-center gap-2">
+                           <ICONS.Growth /> **Potential Strengths**
+                        </h4>
+                        <ul className="space-y-3">
+                          {comp.strengths.map((s, i) => (
+                            <li key={i} className="flex gap-3 text-sm text-slate-600 leading-relaxed italic">
+                              <span className="text-emerald-500 shrink-0">●</span>
+                              <span>{s}</span>
+                            </li>
+                          ))}
+                        </ul>
+                      </div>
+                      <div className="space-y-4">
+                        <h4 className="text-[11px] font-black uppercase tracking-widest text-rose-600 flex items-center gap-2">
+                           <ICONS.Security /> **Potential Weaknesses**
+                        </h4>
+                        <ul className="space-y-3">
+                          {comp.weaknesses.map((w, i) => (
+                            <li key={i} className="flex gap-3 text-sm text-slate-600 leading-relaxed italic">
+                              <span className="text-rose-500 shrink-0">●</span>
+                              <span>{w}</span>
+                            </li>
+                          ))}
+                        </ul>
+                      </div>
+                    </div>
+
+                    <div className="bg-indigo-900 text-white rounded-[2.5rem] p-10 shadow-2xl relative overflow-hidden group">
+                      <div className="absolute top-0 right-0 p-12 opacity-10 group-hover:rotate-12 transition-transform"><ICONS.Trophy className="w-32 h-32" /></div>
+                      <div className="relative z-10 space-y-4">
+                        <div className="flex items-center gap-3">
+                           <div className="w-1.5 h-6 bg-indigo-500 rounded-full"></div>
+                           <h4 className="text-[10px] font-black uppercase tracking-[0.4em] text-indigo-300">**Strategic Articulation: Our Wedge**</h4>
+                        </div>
+                        <p className="text-2xl font-black italic leading-tight text-white tracking-tight">
+                          “{comp.ourWedge}”
+                        </p>
+                        <p className="text-indigo-400 text-[10px] font-bold uppercase tracking-widest pt-2">Weaponized Differentiation Hook</p>
+                      </div>
                     </div>
                   </div>
                 </div>

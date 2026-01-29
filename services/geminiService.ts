@@ -1,4 +1,3 @@
-
 import { GoogleGenAI, Type, Modality } from "@google/genai";
 import { AnalysisResult, MeetingContext } from "../types";
 
@@ -263,7 +262,14 @@ export async function analyzeSalesContext(filesContent: string, context: Meeting
   Solution Domain: ${context.productDomain}.
   
   TASK: Synthesize the provided documents into a strategic weapon.
-  COMPETITIVE INTELLIGENCE: Analyze the documents for mentioned or implied competitors. Identify their strengths/weaknesses and define "Our Wedge" (our unique advantage).
+  
+  COMPETITIVE INTELLIGENCE REQUIREMENTS: 
+  - Analyze documents for ANY direct or indirect competitors mentioned or implied.
+  - For each competitor, provide:
+    1. A brief overview of their market position.
+    2. Strengths relative to our solution.
+    3. Weaknesses relative to our solution.
+    4. "Our Wedge": The specific articular logic a salesperson should use to win against this competitor based on document context.
   
   --- GROUNDING DOCUMENTS --- 
   ${filesContent}`;

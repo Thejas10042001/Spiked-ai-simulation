@@ -1,4 +1,3 @@
-
 import React, { useState, useEffect } from 'react';
 import { MeetingContext, CustomerPersonaType } from '../types';
 import { ICONS } from '../constants';
@@ -16,10 +15,20 @@ const PERSONAS: { type: CustomerPersonaType; label: string; desc: string; icon: 
 ];
 
 const ANSWER_STYLES = [
-  "Executive Summary", "Analogy Based", "Data-Driven Insights",
-  "Concise Answer", "In-Depth Response", "Answer in Points", "Use Analogy", 
-  "Define Technical Terms", "Sales Points", "Key Statistics", "Case Study Summary", 
-  "Competitive Comparison", "Anticipated Customer Questions", "Information Gap", 
+  "Executive Summary", 
+  "Analogy Based", 
+  "Data-Driven Insights",
+  "Concise Answer", 
+  "In-Depth Response", 
+  "Answer in Points", 
+  "Use Analogy", 
+  "Define Technical Terms", 
+  "Sales Points", 
+  "Key Statistics", 
+  "Case Study Summary", 
+  "Competitive Comparison", 
+  "Anticipated Customer Questions", 
+  "Information Gap", 
   "Pricing Overview"
 ];
 
