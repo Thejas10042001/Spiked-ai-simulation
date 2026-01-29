@@ -21,7 +21,6 @@ const ANSWER_STYLES = [
   "Concise Answer", 
   "In-Depth Response", 
   "Answer in Points", 
-  "Use Analogy", 
   "Define Technical Terms", 
   "Sales Points", 
   "Key Statistics", 
@@ -29,7 +28,22 @@ const ANSWER_STYLES = [
   "Competitive Comparison", 
   "Anticipated Customer Questions", 
   "Information Gap", 
-  "Pricing Overview"
+  "Pricing Overview",
+  "ROI Forecast",
+  "SWOT Analysis",
+  "Strategic Roadmap",
+  "Risk Assessment",
+  "Implementation Timeline",
+  "Technical Deep-Dive",
+  "Value Proposition",
+  "Financial Justification",
+  "Stakeholder Alignment",
+  "Competitive Wedge",
+  "Success Story Summary",
+  "Psychological Projection",
+  "Buying Fear Mitigation",
+  "Security & Compliance",
+  "Decision Matrix"
 ];
 
 export const MeetingContextConfig: React.FC<MeetingContextConfigProps> = ({ context, onContextChange }) => {
@@ -180,12 +194,12 @@ export const MeetingContextConfig: React.FC<MeetingContextConfigProps> = ({ cont
         <h3 className="text-xl font-bold text-slate-800 flex items-center gap-2">
           <ICONS.Sparkles /> Desired Strategic Response Styles
         </h3>
-        <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-4">
+        <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-5 gap-4">
           {ANSWER_STYLES.map(style => (
             <button
               key={style}
               onClick={() => toggleStyle(style)}
-              className={`px-6 py-4 rounded-[1.25rem] text-[10px] font-black uppercase tracking-widest border transition-all ${context.answerStyles.includes(style) ? 'bg-indigo-600 text-white border-indigo-600 shadow-lg' : 'bg-white text-slate-500 border-slate-100 hover:border-indigo-200 shadow-sm'}`}
+              className={`px-4 py-4 rounded-[1.25rem] text-[9px] font-black uppercase tracking-widest border transition-all leading-tight text-center ${context.answerStyles.includes(style) ? 'bg-indigo-600 text-white border-indigo-600 shadow-lg' : 'bg-white text-slate-500 border-slate-100 hover:border-indigo-200 shadow-sm'}`}
             >
               {style}
             </button>

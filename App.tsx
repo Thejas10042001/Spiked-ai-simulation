@@ -33,10 +33,10 @@ const App: React.FC = () => {
     thinkingLevel: "Medium",
     temperature: 1.0,
     answerStyles: [
+      "Executive Summary",
+      "Data-Driven Insights",
       "Concise Answer", 
       "Sales Points", 
-      "Define Technical Terms", 
-      "Competitive Comparison", 
       "Anticipated Customer Questions"
     ],
     executiveSnapshot: "",
