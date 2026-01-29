@@ -1,5 +1,6 @@
-import React, { useState, useEffect } from 'react';
-import { MeetingContext, CustomerPersonaType } from '../types';
+
+import React, { useState, useEffect, useRef } from 'react';
+import { MeetingContext, CustomerPersonaType, ThinkingLevel } from '../types';
 import { ICONS } from '../constants';
 
 interface MeetingContextConfigProps {
@@ -13,6 +14,15 @@ const PERSONAS: { type: CustomerPersonaType; label: string; desc: string; icon: 
   { type: 'Financial', label: 'Financial', desc: 'ROI-driven, cost-benefit analysis (CFO, Financial Controller)', icon: <ICONS.ROI /> },
   { type: 'Business Executives', label: 'Executives', desc: 'Strategic impact, operational clarity (CEO, Founder, MD)', icon: <ICONS.Trophy /> },
 ];
+
+const THINKING_LEVEL_MAP: Record<ThinkingLevel, number> = {
+  'Minimal': 0,
+  'Low': 4000,
+  'Medium': 16000,
+  'High': 32768
+};
+
+const TEMPERATURE_STEPS = [0, 0.15, 0.6, 0.95, 1, 1.6, 2];
 
 const ANSWER_STYLES = [
   "Executive Summary", 
@@ -34,10 +44,21 @@ const ANSWER_STYLES = [
 
 export const MeetingContextConfig: React.FC<MeetingContextConfigProps> = ({ context, onContextChange }) => {
   const [keywordInput, setKeywordInput] = useState("");
+  const [localPrompt, setLocalPrompt] = useState(context.baseSystemPrompt);
+  const [isSaved, setIsSaved] = useState(false);
+  const isCustomizedRef = useRef(false);
 
   useEffect(() => {
-    generateBasePrompt();
+    // Only auto-generate if the user hasn't explicitly customized the prompt
+    if (!isCustomizedRef.current) {
+      generateBasePrompt();
+    }
   }, [context.persona, context.answerStyles, context.meetingFocus]);
+
+  // Sync local prompt if context changes externally (like from reset)
+  useEffect(() => {
+    setLocalPrompt(context.baseSystemPrompt);
+  }, [context.baseSystemPrompt]);
 
   const generateBasePrompt = () => {
     let prompt = `Act as a Cognitive AI Sales Intelligence Agent for ${context.persona} buyers. `;
@@ -50,12 +71,25 @@ export const MeetingContextConfig: React.FC<MeetingContextConfigProps> = ({ cont
     prompt += `Always ground your logic in source documents and maintain a ${context.persona.toLowerCase()} tone.`;
     
     if (prompt !== context.baseSystemPrompt) {
+      setLocalPrompt(prompt);
       onContextChange({ ...context, baseSystemPrompt: prompt });
     }
   };
 
   const handleChange = (field: keyof MeetingContext, value: any) => {
     onContextChange({ ...context, [field]: value });
+  };
+
+  const handlePromptChange = (val: string) => {
+    setLocalPrompt(val);
+    isCustomizedRef.current = true;
+    setIsSaved(false);
+  };
+
+  const savePrompt = () => {
+    onContextChange({ ...context, baseSystemPrompt: localPrompt });
+    setIsSaved(true);
+    setTimeout(() => setIsSaved(false), 2000);
   };
 
   const toggleStyle = (style: string) => {
@@ -85,7 +119,6 @@ export const MeetingContextConfig: React.FC<MeetingContextConfigProps> = ({ cont
         </div>
 
         <div className="grid grid-cols-1 lg:grid-cols-3 gap-12">
-          {/* Internal: Seller Info */}
           <div className="space-y-6">
             <div className="flex items-center gap-2 pb-2 border-b border-slate-100">
                <div className="text-indigo-500"><ICONS.Trophy /></div>
@@ -97,7 +130,6 @@ export const MeetingContextConfig: React.FC<MeetingContextConfigProps> = ({ cont
             </div>
           </div>
 
-          {/* External: Client Info */}
           <div className="space-y-6">
             <div className="flex items-center gap-2 pb-2 border-b border-slate-100">
                <div className="text-rose-500"><ICONS.Search /></div>
@@ -109,7 +141,6 @@ export const MeetingContextConfig: React.FC<MeetingContextConfigProps> = ({ cont
             </div>
           </div>
 
-          {/* Context: Deal Info */}
           <div className="space-y-6">
             <div className="flex items-center gap-2 pb-2 border-b border-slate-100">
                <div className="text-emerald-500"><ICONS.Efficiency /></div>
@@ -129,6 +160,76 @@ export const MeetingContextConfig: React.FC<MeetingContextConfigProps> = ({ cont
                placeholder="e.g. ROI presentation, Technical deep-dive on integration APIs, Q3 Budget Review"
                isLarge
              />
+          </div>
+        </div>
+      </div>
+
+      {/* Neural Tuning Section (Thinking Level & Temperature) */}
+      <div className="bg-white rounded-[2.5rem] p-10 shadow-xl border border-slate-100 space-y-8">
+        <div className="flex items-center gap-3 mb-4">
+          <div className="p-3 bg-indigo-600 text-white rounded-2xl shadow-lg"><ICONS.Efficiency /></div>
+          <div>
+            <h3 className="text-xl font-bold text-slate-800 tracking-tight">Neural Strategy Tuning</h3>
+            <p className="text-xs text-slate-400 font-bold uppercase tracking-widest">Adjust Cognitive Depth & Creative Divergence</p>
+          </div>
+        </div>
+
+        <div className="grid grid-cols-1 md:grid-cols-2 gap-10">
+          {/* Thinking Level */}
+          <div className="space-y-4">
+            <div className="flex items-center justify-between">
+              <label className="text-[10px] font-black uppercase tracking-widest text-slate-500">Thinking Level (Cognitive Budget)</label>
+              <span className="text-[10px] font-bold text-indigo-500 bg-indigo-50 px-2 py-0.5 rounded-full">{THINKING_LEVEL_MAP[context.thinkingLevel].toLocaleString()} Tokens</span>
+            </div>
+            <div className="grid grid-cols-4 gap-2">
+              {(Object.keys(THINKING_LEVEL_MAP) as ThinkingLevel[]).map(level => (
+                <button
+                  key={level}
+                  onClick={() => handleChange('thinkingLevel', level)}
+                  className={`py-3 rounded-xl text-[10px] font-black uppercase tracking-tighter border transition-all ${context.thinkingLevel === level ? 'bg-indigo-600 text-white border-indigo-600 shadow-md scale-[1.05]' : 'bg-white text-slate-400 border-slate-100 hover:border-indigo-200'}`}
+                >
+                  {level}
+                </button>
+              ))}
+            </div>
+            <p className="text-[9px] text-slate-400 italic">Determines the depth of document cross-referencing. High = Maximum deductive reasoning.</p>
+          </div>
+
+          {/* Temperature */}
+          <div className="space-y-4">
+            <div className="flex items-center justify-between">
+              <label className="text-[10px] font-black uppercase tracking-widest text-slate-500">Temperature (Probabilistic Creativity)</label>
+              <input 
+                type="number" 
+                step="0.01" 
+                min="0" 
+                max="2" 
+                value={context.temperature}
+                onChange={(e) => handleChange('temperature', parseFloat(e.target.value) || 0)}
+                className="w-16 bg-white border border-slate-200 rounded-lg px-2 py-1 text-[11px] font-bold text-center text-indigo-600 outline-none focus:border-indigo-400 shadow-sm"
+              />
+            </div>
+            <input 
+              type="range" 
+              min="0" 
+              max="2" 
+              step="0.05"
+              value={context.temperature}
+              onChange={(e) => handleChange('temperature', parseFloat(e.target.value))}
+              className="w-full h-1.5 bg-slate-200 rounded-full appearance-none cursor-pointer accent-indigo-600"
+            />
+            <div className="flex justify-between px-1">
+              {TEMPERATURE_STEPS.map(step => (
+                <button 
+                  key={step} 
+                  onClick={() => handleChange('temperature', step)}
+                  className={`text-[9px] font-black transition-colors ${context.temperature === step ? 'text-indigo-600 scale-125' : 'text-slate-300 hover:text-slate-400'}`}
+                >
+                  {step}
+                </button>
+              ))}
+            </div>
+            <p className="text-[9px] text-slate-400 italic">0: Pure logical grounding. 1: Balanced. 2: Abstract strategic metaphors.</p>
           </div>
         </div>
       </div>
@@ -225,19 +326,58 @@ export const MeetingContextConfig: React.FC<MeetingContextConfigProps> = ({ cont
           <ICONS.Brain className="text-indigo-400 w-24 h-24" />
         </div>
         <div className="relative z-10 space-y-6">
-          <div className="flex items-center gap-4">
-            <div className="w-1.5 h-6 bg-indigo-500 rounded-full"></div>
-            <h3 className="text-indigo-400 text-[11px] font-black uppercase tracking-[0.4em]">Neural Core System Prompt</h3>
+          <div className="flex items-center justify-between">
+            <div className="flex items-center gap-4">
+              <div className="w-1.5 h-6 bg-indigo-500 rounded-full"></div>
+              <h3 className="text-indigo-400 text-[11px] font-black uppercase tracking-[0.4em]">Neural Core System Prompt</h3>
+            </div>
+            
+            <button 
+              onClick={savePrompt}
+              className={`flex items-center gap-2 px-6 py-2.5 rounded-xl text-[11px] font-black uppercase tracking-widest transition-all shadow-lg active:scale-95 ${isSaved ? 'bg-emerald-500 text-white ring-4 ring-emerald-500/20' : 'bg-indigo-600 text-white hover:bg-indigo-700 hover:shadow-indigo-500/20'}`}
+            >
+              {isSaved ? (
+                <>
+                  <svg xmlns="http://www.w3.org/2000/svg" className="w-4 h-4" viewBox="0 0 20 20" fill="currentColor">
+                    <path fillRule="evenodd" d="M16.707 5.293a1 1 0 010 1.414l-8 8a1 1 0 01-1.414 0l-4-4a1 1 0 011.414-1.414L8 12.586l7.293-7.293a1 1 0 011.414 0z" clipRule="evenodd" />
+                  </svg>
+                  Prompt Retained
+                </>
+              ) : (
+                <>
+                  <svg xmlns="http://www.w3.org/2000/svg" className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={3} d="M8 7H5a2 2 0 00-2 2v9a2 2 0 002 2h14a2 2 0 002-2V9a2 2 0 00-2-2h-3m-1 4l-3 3m0 0l-3-3m3 3V4" />
+                  </svg>
+                  Update & Save Prompt
+                </>
+              )}
+            </button>
           </div>
+          
           <textarea
-            value={context.baseSystemPrompt}
-            onChange={e => handleChange('baseSystemPrompt', e.target.value)}
-            className="w-full bg-slate-800/40 text-slate-300 border-2 border-slate-700/50 rounded-[2rem] p-8 text-sm focus:border-indigo-500 outline-none transition-all h-32 font-mono leading-relaxed"
+            value={localPrompt}
+            onChange={e => handlePromptChange(e.target.value)}
+            className="w-full bg-slate-800/40 text-slate-200 border-2 border-slate-700/50 rounded-[2.5rem] p-10 text-sm focus:border-indigo-500 outline-none transition-all h-40 font-mono leading-relaxed shadow-inner"
             placeholder="AI system prompt..."
           />
-          <div className="flex items-center gap-2">
-             <div className="w-2 h-2 bg-indigo-500 rounded-full animate-pulse"></div>
-             <p className="text-slate-500 text-[10px] font-medium italic">Engine automatically updates based on persona and style changes. Manual overrides are supported.</p>
+          
+          <div className="flex items-center justify-between">
+            <div className="flex items-center gap-2">
+              <div className={`w-2 h-2 rounded-full ${isCustomizedRef.current ? 'bg-amber-500 shadow-[0_0_10px_rgba(245,158,11,0.5)]' : 'bg-indigo-500 animate-pulse shadow-[0_0_10px_rgba(99,102,241,0.5)]'}`}></div>
+              <p className="text-slate-500 text-[10px] font-black uppercase tracking-widest">
+                {isCustomizedRef.current 
+                  ? "Manual Neural Override Active" 
+                  : "Engine Auto-Synchronization Enabled"}
+              </p>
+            </div>
+            {isCustomizedRef.current && (
+              <button 
+                onClick={() => { isCustomizedRef.current = false; generateBasePrompt(); }}
+                className="text-[9px] font-black uppercase tracking-widest text-indigo-400 hover:text-indigo-300 transition-colors border-b border-indigo-400/30 pb-0.5"
+              >
+                Reset to Core Logic
+              </button>
+            )}
           </div>
         </div>
       </div>

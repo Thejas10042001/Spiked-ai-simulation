@@ -120,6 +120,8 @@ export interface UploadedFile {
 
 export type CustomerPersonaType = 'Balanced' | 'Technical' | 'Financial' | 'Business Executives';
 
+export type ThinkingLevel = 'Minimal' | 'Low' | 'Medium' | 'High';
+
 export interface MeetingContext {
   sellerCompany: string;
   sellerNames: string;
@@ -133,4 +135,6 @@ export interface MeetingContext {
   executiveSnapshot: string;
   strategicKeywords: string[];
   baseSystemPrompt: string;
+  thinkingLevel: ThinkingLevel;
+  temperature: number;
 }
