@@ -14,15 +14,6 @@ const PERSONAS: { type: CustomerPersonaType; label: string; desc: string; icon: 
   { type: 'Business Executives', label: 'Executives', desc: 'Strategic impact, operational clarity (CEO, Founder, MD)', icon: <ICONS.Trophy /> },
 ];
 
-const THINKING_LEVEL_MAP: Record<ThinkingLevel, number> = {
-  'Minimal': 0,
-  'Low': 4000,
-  'Medium': 16000,
-  'High': 32768
-};
-
-const TEMPERATURE_STEPS = [0, 0.15, 0.6, 0.95, 1, 1.6, 2];
-
 const ANSWER_STYLES = [
   "Executive Summary", 
   "Analogy Based", 
@@ -60,12 +51,12 @@ export const MeetingContextConfig: React.FC<MeetingContextConfigProps> = ({ cont
   const generateBasePrompt = () => {
     let prompt = `Act as a Cognitive AI Sales Intelligence Agent for ${context.persona} buyers. `;
     if (context.answerStyles.length > 0) {
-      prompt += `Your responses should strictly follow these styles: ${context.answerStyles.join(', ')}. `;
+      prompt += `Your responses should strictly follow these styles as headers: ${context.answerStyles.join(', ')}. `;
     }
     if (context.meetingFocus) {
       prompt += `The primary meeting focus is ${context.meetingFocus}. `;
     }
-    prompt += `Always ground your logic in source documents and maintain a ${context.persona.toLowerCase()} tone.`;
+    prompt += `Always ground your logic in source documents and maintain a ${context.persona.toLowerCase()} tone. Use high-density articulation.`;
     
     if (prompt !== context.baseSystemPrompt) {
       setLocalPrompt(prompt);
@@ -157,64 +148,6 @@ export const MeetingContextConfig: React.FC<MeetingContextConfigProps> = ({ cont
                placeholder="e.g. ROI presentation, Technical deep-dive on integration APIs, Q3 Budget Review"
                isLarge
              />
-          </div>
-        </div>
-      </div>
-
-      {/* Neural Core Settings (Thinking Level & Temp) */}
-      <div className="bg-white rounded-[2.5rem] p-10 shadow-xl border border-slate-100 space-y-8">
-        <div className="flex items-center gap-3">
-          <div className="p-3 bg-indigo-600 text-white rounded-2xl shadow-lg"><ICONS.Brain /></div>
-          <div>
-            <h3 className="text-xl font-bold text-slate-800 tracking-tight">Neural Core Parameters</h3>
-            <p className="text-xs text-slate-400 font-bold uppercase tracking-widest">Tune Cognitive Reasoning & Abstract Creativity</p>
-          </div>
-        </div>
-
-        <div className="grid grid-cols-1 md:grid-cols-2 gap-10">
-          <div className="space-y-4">
-            <div className="flex items-center justify-between">
-              <label className="text-[10px] font-black uppercase tracking-widest text-slate-500">Thinking Level</label>
-              <span className="text-[10px] font-bold text-indigo-500 bg-indigo-50 px-2 py-0.5 rounded-full">{THINKING_LEVEL_MAP[context.thinkingLevel].toLocaleString()} Tokens</span>
-            </div>
-            <div className="grid grid-cols-4 gap-2">
-              {(Object.keys(THINKING_LEVEL_MAP) as ThinkingLevel[]).map(level => (
-                <button
-                  key={level}
-                  onClick={() => handleChange('thinkingLevel', level)}
-                  className={`py-3 rounded-xl text-[10px] font-black uppercase border transition-all ${context.thinkingLevel === level ? 'bg-indigo-600 text-white border-indigo-600 shadow-md scale-[1.05]' : 'bg-white text-slate-400 border-slate-100 hover:border-indigo-200'}`}
-                >
-                  {level}
-                </button>
-              ))}
-            </div>
-          </div>
-
-          <div className="space-y-4">
-            <div className="flex items-center justify-between">
-              <label className="text-[10px] font-black uppercase tracking-widest text-slate-500">Temperature</label>
-              <span className="text-[11px] font-bold text-indigo-600">{context.temperature.toFixed(2)}</span>
-            </div>
-            <input 
-              type="range" 
-              min="0" 
-              max="2" 
-              step="0.05"
-              value={context.temperature}
-              onChange={(e) => handleChange('temperature', parseFloat(e.target.value))}
-              className="w-full h-1.5 bg-slate-200 rounded-full appearance-none cursor-pointer accent-indigo-600"
-            />
-            <div className="flex justify-between px-1">
-              {TEMPERATURE_STEPS.map(step => (
-                <button 
-                  key={step} 
-                  onClick={() => handleChange('temperature', step)}
-                  className={`text-[9px] font-black transition-colors ${context.temperature === step ? 'text-indigo-600 scale-125' : 'text-slate-300 hover:text-slate-400'}`}
-                >
-                  {step}
-                </button>
-              ))}
-            </div>
           </div>
         </div>
       </div>

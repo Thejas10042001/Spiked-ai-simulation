@@ -10,13 +10,6 @@ import { analyzeSalesContext } from './services/geminiService';
 import { AnalysisResult, UploadedFile, MeetingContext, ThinkingLevel } from './types';
 import { ICONS } from './constants';
 
-const THINKING_LEVEL_MAP: Record<ThinkingLevel, number> = {
-  'Minimal': 0,
-  'Low': 4000,
-  'Medium': 16000,
-  'High': 32768
-};
-
 const App: React.FC = () => {
   const [files, setFiles] = useState<UploadedFile[]>([]);
   const [analysis, setAnalysis] = useState<AnalysisResult | null>(null);
@@ -40,11 +33,11 @@ const App: React.FC = () => {
     thinkingLevel: "Medium",
     temperature: 1.0,
     answerStyles: [
+      "Concise Answer", 
       "Sales Points", 
-      "Key Statistics", 
+      "Define Technical Terms", 
       "Competitive Comparison", 
-      "Anticipated Customer Questions", 
-      "Pricing Overview"
+      "Anticipated Customer Questions"
     ],
     executiveSnapshot: "",
     strategicKeywords: [],
@@ -150,7 +143,7 @@ const App: React.FC = () => {
                     {isAnyFileProcessing ? 'Retaining Documents...' : 'Synthesize Strategy Core'}
                   </button>
                   <p className="text-[10px] text-slate-400 font-black uppercase tracking-widest italic">
-                    Analysis will use T={meetingContext.temperature.toFixed(2)} / B={THINKING_LEVEL_MAP[meetingContext.thinkingLevel].toLocaleString()}
+                    Neural Articulation Engine Grounded
                   </p>
                 </div>
               </div>
@@ -166,7 +159,6 @@ const App: React.FC = () => {
             </div>
             <div className="text-center">
               <p className="text-2xl font-bold text-slate-800 animate-pulse tracking-tight">{statusMessage}</p>
-              <p className="text-sm text-slate-400 mt-3 font-medium uppercase tracking-[0.2em]">Config: T={meetingContext.temperature.toFixed(2)} / B={THINKING_LEVEL_MAP[meetingContext.thinkingLevel].toLocaleString()}</p>
             </div>
           </div>
         ) : (
