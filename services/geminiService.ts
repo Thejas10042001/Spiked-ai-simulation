@@ -57,7 +57,6 @@ export interface CognitiveSearchResult {
 
 /**
  * Performs a deeply grounded search utilizing full meeting context.
- * Enforces specific response styles as mandatory Markdown headers.
  */
 export async function performCognitiveSearch(
   question: string, 
@@ -66,7 +65,6 @@ export async function performCognitiveSearch(
 ): Promise<CognitiveSearchResult> {
   const modelName = 'gemini-3-pro-preview';
   
-  // Mandatory headers based on user configuration
   const mandatoryStyles = context.answerStyles.length > 0 
     ? context.answerStyles 
     : ["Strategic Analysis", "Grounded Evidence"];
@@ -76,7 +74,7 @@ export async function performCognitiveSearch(
   const prompt = `MEETING INTELLIGENCE CONTEXT:
   - Seller: ${context.sellerNames} from ${context.sellerCompany}
   - Prospect: ${context.clientNames} from ${context.clientCompany}
-  - Persona Profile: ${context.persona} (Focus: ${context.persona === 'Financial' ? 'Fiscal ROI' : context.persona === 'Technical' ? 'Systems Integrity' : 'Business Velocity'})
+  - Persona Profile: ${context.persona}
   - Focus: ${context.meetingFocus}
   
   TASK: Synthesize a COGNITIVE ARTICULAR response to: "${question}".
@@ -84,11 +82,6 @@ export async function performCognitiveSearch(
   STRATEGIC OUTPUT STRUCTURE (MANDATORY):
   You MUST organize the "answer" field using the following headers in order:
   ${styleDirectives}
-
-  COGNITIVE REQUIREMENTS:
-  1. Use "High-Density Articulation": Precise, dense professional language. No fluff.
-  2. Ground every single claim in the provided document content.
-  3. Ensure each section header matches the user's configuration exactly.
 
   DOCUMENT SOURCE DATA:
   ${filesContent || "No documents provided."}
@@ -100,15 +93,15 @@ export async function performCognitiveSearch(
       model: modelName,
       contents: prompt,
       config: {
-        systemInstruction: context.baseSystemPrompt || `You are a world-class Sales Intelligence Agent. Your goal is to provide highly structured, persona-aligned strategic answers that use the user's selected styles as explicit section headers.`,
+        systemInstruction: context.baseSystemPrompt || `You are a world-class Sales Intelligence Agent. Provide persona-aligned strategic answers with explicit section headers.`,
         responseMimeType: "application/json",
         temperature: context.temperature,
         thinkingConfig: { thinkingBudget: THINKING_LEVEL_MAP[context.thinkingLevel] },
         responseSchema: {
           type: Type.OBJECT,
           properties: {
-            answer: { type: Type.STRING, description: "Markdown text with specific user-defined headers" },
-            briefExplanation: { type: Type.STRING, description: "A high-level 2-sentence executive summary" },
+            answer: { type: Type.STRING },
+            briefExplanation: { type: Type.STRING },
             articularSoundbite: { type: Type.STRING },
             psychologicalProjection: {
               type: Type.OBJECT,
@@ -147,13 +140,13 @@ export async function performCognitiveSearch(
     
     return JSON.parse(response.text || "{}");
   } catch (error: any) {
-    throw new Error("Cognitive articulation engine encountered a synthesis error.");
+    throw new Error("Cognitive search synthesis failed.");
   }
 }
 
 export async function generateDynamicSuggestions(filesContent: string, context: MeetingContext): Promise<string[]> {
   const modelName = 'gemini-3-flash-preview';
-  const prompt = `Suggest 3 strategic questions for a ${context.persona} stakeholder at ${context.clientCompany} regarding ${context.meetingFocus}. Return as JSON array.`;
+  const prompt = `Suggest 3 strategic questions for ${context.clientCompany} regarding ${context.meetingFocus}. Return JSON array.`;
   const response = await ai.models.generateContent({ model: modelName, contents: prompt, config: { responseMimeType: "application/json" } });
   return JSON.parse(response.text || "[]");
 }
@@ -180,7 +173,7 @@ export async function decodeAudioData(data: Uint8Array, ctx: AudioContext, sampl
 export async function generateExplanation(question: string, context: AnalysisResult): Promise<string> {
   const response = await ai.models.generateContent({
     model: 'gemini-3-flash-preview',
-    contents: `Briefly explain this sales strategy question: "${question}" based on: ${JSON.stringify(context.snapshot)}`,
+    contents: `Explain this sales strategy question: "${question}" based on: ${JSON.stringify(context.snapshot)}`,
   });
   return response.text || "";
 }
@@ -280,16 +273,21 @@ export async function analyzeSalesContext(filesContent: string, context: Meeting
     required: ["snapshot", "documentInsights", "competitiveComparison", "openingLines", "predictedQuestions", "strategicQuestionsToAsk", "objectionHandling", "toneGuidance", "finalCoaching"]
   };
 
-  const prompt = `Perform a high-fidelity cognitive sales intelligence analysis for: ${context.clientCompany}. 
-  Meeting Context: ${context.meetingFocus}.
-  Solution Domain: ${context.productDomain}.
-  Target Stakeholder Persona: ${context.persona}.
+  const prompt = `Synthesize high-fidelity cognitive sales intelligence. 
   
-  TASK: Synthesize the provided documents into a strategic weapon.
-  - Model the ${context.persona}'s likely internal narrative.
-  - Predict objections specific to ${context.meetingFocus}.
-  - Use high-density Articular logic throughout.
+  DOCUMENT UNDERSTANDING REQUIREMENTS:
+  Extract exactly into 'documentInsights.entities':
+  - 'Company': Target client or partners.
+  - 'Person': Key personnel with roles.
+  - 'Product': Names of software/projects.
+  - 'Metric': Financial/KPI data points.
   
+  For EVERY entity:
+  1. Provide a grounded 'name'.
+  2. Assign a 'type' from above.
+  3. Include 'context' on relevance to this deal.
+  4. Link to a high-quality 'citation'.
+
   --- GROUNDING DOCUMENTS --- 
   ${filesContent}`;
 
@@ -298,7 +296,7 @@ export async function analyzeSalesContext(filesContent: string, context: Meeting
       model: modelName,
       contents: prompt,
       config: {
-        systemInstruction: context.baseSystemPrompt || `You are a Cognitive AI Sales Strategist. Persona: ${context.persona}. Target Solution: ${context.targetProducts}. Always provide grounded, articular intelligence.`,
+        systemInstruction: context.baseSystemPrompt || `You are a Cognitive Sales Strategist. Provide grounded intelligence.`,
         responseMimeType: "application/json",
         responseSchema,
         temperature: context.temperature,
@@ -306,11 +304,7 @@ export async function analyzeSalesContext(filesContent: string, context: Meeting
       },
     });
     
-    let text = response.text || "{}";
-    const jsonMatch = text.match(/\{[\s\S]*\}/);
-    if (jsonMatch) text = jsonMatch[0];
-    
-    return JSON.parse(text) as AnalysisResult;
+    return JSON.parse(response.text || "{}") as AnalysisResult;
   } catch (error: any) {
     throw new Error(`Intelligence Analysis Failed: ${error.message}`);
   }
@@ -318,7 +312,7 @@ export async function analyzeSalesContext(filesContent: string, context: Meeting
 
 export async function generateVideoStoryboard(analysis: AnalysisResult): Promise<VideoStoryboard[]> {
   const modelName = 'gemini-3-flash-preview';
-  const prompt = `Generate 3 distinct cinematic video concepts based on this sales analysis. Return JSON array.`;
+  const prompt = `Generate 3 distinct cinematic video concepts. Return JSON array.`;
   const response = await ai.models.generateContent({
     model: modelName,
     contents: prompt,
