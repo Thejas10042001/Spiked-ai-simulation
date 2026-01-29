@@ -1,4 +1,3 @@
-
 import { GoogleGenAI, Type, Modality } from "@google/genai";
 import { AnalysisResult, MeetingContext } from "../types";
 
@@ -186,78 +185,6 @@ export async function generateDynamicSuggestions(filesContent: string, context: 
   }
 }
 
-export interface VideoStoryboard {
-  id: string;
-  title: string;
-  angle: string;
-  description: string;
-  veoPrompt: string;
-}
-
-export async function generateVideoStoryboard(analysis: AnalysisResult): Promise<VideoStoryboard[]> {
-  const prompt = `Based on this sales analysis of a ${analysis.snapshot.role}, generate 3 distinct cinematic video concepts for a sales explainer.
-  
-  CONTEXT:
-  Priorities: ${(analysis.snapshot.priorities || []).map(p => p.text).join(', ')}
-  Tone: ${analysis.snapshot.tone}
-  
-  Return a JSON array of 3 objects with:
-  - "id": string (unique)
-  - "title": string (engaging title)
-  - "angle": string (one word, e.g. "Emotional", "Logical", "Urgent")
-  - "description": string (short description)
-  - "veoPrompt": string (detailed visual prompt for a video generation model like Veo)`;
-
-  try {
-    const response = await ai.models.generateContent({
-      model: 'gemini-3-flash-preview',
-      contents: prompt,
-      config: {
-        responseMimeType: "application/json",
-        responseSchema: {
-          type: Type.ARRAY,
-          items: {
-            type: Type.OBJECT,
-            properties: {
-              id: { type: Type.STRING },
-              title: { type: Type.STRING },
-              angle: { type: Type.STRING },
-              description: { type: Type.STRING },
-              veoPrompt: { type: Type.STRING }
-            },
-            required: ["id", "title", "angle", "description", "veoPrompt"]
-          }
-        }
-      }
-    });
-    return JSON.parse(response.text || "[]");
-  } catch (e) {
-    return [
-      { id: '1', title: 'The Efficiency Engine', angle: 'Logical', description: 'A sleek data-driven visualization of ROI.', veoPrompt: 'Cinematic abstract data visualization showing growth' },
-      { id: '2', title: 'Risk Guard', angle: 'Protective', description: 'Visualizing security and stability.', veoPrompt: 'A shield made of glowing digital locks in a modern data center' },
-      { id: '3', title: 'The Visionary Leap', angle: 'Emotional', description: 'Focusing on transformation and the future.', veoPrompt: 'A person jumping between glowing platforms in a sunrise city' }
-    ];
-  }
-}
-
-export async function startVideoGeneration(prompt: string, aspectRatio: '16:9' | '9:16') {
-  const dynamicAi = new GoogleGenAI({ apiKey: process.env.API_KEY });
-  return await dynamicAi.models.generateVideos({
-    model: 'veo-3.1-fast-generate-preview',
-    prompt: prompt,
-    config: {
-      numberOfVideos: 1,
-      resolution: '720p',
-      aspectRatio: aspectRatio
-    }
-  });
-}
-
-export async function getVideoStatus(operationId: any) {
-  const dynamicAi = new GoogleGenAI({ apiKey: process.env.API_KEY });
-  return await dynamicAi.operations.getVideosOperation({ operation: operationId });
-}
-
 export function decode(base64: string) {
   const binaryString = atob(base64);
   const len = binaryString.length;
@@ -433,4 +360,88 @@ export async function analyzeSalesContext(filesContent: string, context: Meeting
   } catch (error: any) {
     throw new Error(`Intelligence Analysis Failed: ${error.message}`);
   }
+}
+
+// --- VIDEO GENERATION EXPORTS ---
+
+export interface VideoStoryboard {
+  id: string;
+  title: string;
+  description: string;
+  angle: string;
+  veoPrompt: string;
+}
+
+/**
+ * Conceptualizes video strategy based on AnalysisResult using Gemini 3 Flash.
+ */
+export async function generateVideoStoryboard(analysis: AnalysisResult): Promise<VideoStoryboard[]> {
+  const modelName = 'gemini-3-flash-preview';
+  const prompt = `Based on the following sales analysis for a ${analysis.snapshot.role}, generate 3 distinct cinematic video storyboard concepts for a "Sales Explainer" video.
+  
+  ANALYSIS:
+  ${JSON.stringify(analysis, null, 2)}
+  
+  For each concept, provide:
+  - id: a unique string
+  - title: a catchy title
+  - description: a short description of the visual style and flow
+  - angle: the strategic focus (e.g., "ROI", "Trust", "Innovation")
+  - veoPrompt: a highly detailed visual prompt for a video generation model (Veo). Use vivid, cinematic language. Include camera movements, lighting, and specific visual metaphors.
+  
+  Return ONLY a JSON array of 3 objects matching the VideoStoryboard interface.`;
+
+  try {
+    const response = await ai.models.generateContent({
+      model: modelName,
+      contents: prompt,
+      config: {
+        responseMimeType: "application/json",
+        responseSchema: {
+          type: Type.ARRAY,
+          items: {
+            type: Type.OBJECT,
+            properties: {
+              id: { type: Type.STRING },
+              title: { type: Type.STRING },
+              description: { type: Type.STRING },
+              angle: { type: Type.STRING },
+              veoPrompt: { type: Type.STRING }
+            },
+            required: ["id", "title", "description", "angle", "veoPrompt"]
+          }
+        }
+      }
+    });
+    return JSON.parse(response.text || "[]");
+  } catch (error) {
+    console.error("Storyboard generation failed:", error);
+    return [];
+  }
+}
+
+/**
+ * Initiates video generation using Veo 3.1.
+ * Creates a new GoogleGenAI instance to ensure the latest selected API key is used.
+ */
+export async function startVideoGeneration(prompt: string, aspectRatio: '16:9' | '9:16') {
+  const veoAi = new GoogleGenAI({ apiKey: process.env.API_KEY });
+  return await veoAi.models.generateVideos({
+    model: 'veo-3.1-fast-generate-preview',
+    prompt: prompt,
+    config: {
+      numberOfVideos: 1,
+      resolution: '720p',
+      aspectRatio: aspectRatio
+    }
+  });
+}
+
+/**
+ * Polls for the status of a video generation operation.
+ * Creates a new GoogleGenAI instance to ensure the latest selected API key is used.
+ */
+export async function getVideoStatus(operation: any) {
+  const veoAi = new GoogleGenAI({ apiKey: process.env.API_KEY });
+  return await veoAi.operations.getVideosOperation({ operation: operation });
 }

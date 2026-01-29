@@ -1,9 +1,7 @@
-
 import React, { useState, useCallback, useMemo, useRef } from 'react';
 import { Header } from './components/Header';
 import { FileUpload } from './components/FileUpload';
 import { AnalysisView } from './components/AnalysisView';
-import { VideoGenerator } from './components/VideoGenerator';
 import { AudioGenerator } from './components/AudioGenerator';
 import { PracticeSession } from './components/PracticeSession';
 import { CognitiveSearch } from './components/CognitiveSearch';
@@ -18,7 +16,7 @@ const App: React.FC = () => {
   const [isAnalyzing, setIsAnalyzing] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [statusMessage, setStatusMessage] = useState("");
-  const [activeTab, setActiveTab] = useState<'context' | 'strategy' | 'search' | 'video' | 'practice' | 'audio'>('context');
+  const [activeTab, setActiveTab] = useState<'context' | 'strategy' | 'search' | 'practice' | 'audio'>('context');
 
   // Memory Tracker: Fingerprint the state to avoid redundant re-analysis
   const lastAnalyzedHash = useRef<string | null>(null);
@@ -159,7 +157,6 @@ const App: React.FC = () => {
                 <TabBtn active={activeTab === 'search'} onClick={() => setActiveTab('search')} icon={<ICONS.Search />} label="Intelligence" />
                 <TabBtn active={activeTab === 'audio'} onClick={() => setActiveTab('audio')} icon={<ICONS.Speaker />} label="Audio" />
                 <TabBtn active={activeTab === 'practice'} onClick={() => setActiveTab('practice')} icon={<ICONS.Chat />} label="Live" />
-                <TabBtn active={activeTab === 'video'} onClick={() => setActiveTab('video')} icon={<ICONS.Play />} label="Visual" />
                 <TabBtn active={activeTab === 'context'} onClick={() => setActiveTab('context')} icon={<ICONS.Efficiency />} label="Config" />
               </div>
               <div className="flex items-center gap-4">
@@ -176,7 +173,6 @@ const App: React.FC = () => {
             {activeTab === 'search' && <CognitiveSearch files={files} context={meetingContext} />}
             {activeTab === 'audio' && <AudioGenerator analysis={analysis!} />}
             {activeTab === 'practice' && <PracticeSession analysis={analysis!} />}
-            {activeTab === 'video' && <VideoGenerator analysis={analysis!} />}
           </div>
         )}
       </main>
