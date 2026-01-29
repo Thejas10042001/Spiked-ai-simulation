@@ -1,3 +1,4 @@
+
 import { GoogleGenAI, Type, Modality } from "@google/genai";
 import { AnalysisResult, MeetingContext } from "../types";
 
@@ -48,7 +49,12 @@ export interface CognitiveSearchResult {
   };
 }
 
-export async function performCognitiveSearch(question: string, filesContent: string, context: MeetingContext): Promise<CognitiveSearchResult> {
+export async function performCognitiveSearch(
+  question: string, 
+  filesContent: string, 
+  context: MeetingContext,
+  tuning: { thinkingBudget: number, temperature: number }
+): Promise<CognitiveSearchResult> {
   const modelName = 'gemini-3-pro-preview';
   
   const prompt = `MEETING INTELLIGENCE CONTEXT:
@@ -81,6 +87,8 @@ export async function performCognitiveSearch(question: string, filesContent: str
       config: {
         systemInstruction: `You are Avi from Spiked, a world-class Sales Strategist. Your goal is to make the salesperson sound like the smartest person in the room by providing "Cognitive Articulation" — the ability to speak to the buyer's hidden professional motivations.`,
         responseMimeType: "application/json",
+        temperature: tuning.temperature,
+        thinkingConfig: { thinkingBudget: tuning.thinkingBudget },
         responseSchema: {
           type: Type.OBJECT,
           properties: {
