@@ -59,8 +59,11 @@ export const AnalysisView: React.FC<AnalysisViewProps> = ({ result, files }) => 
 
   const toggleObjection = (idx: number) => {
     const next = new Set(expandedObjections);
-    if (next.has(idx)) next.delete(idx);
-    else next.add(idx);
+    if (next.has(idx)) {
+      next.delete(idx);
+    } else {
+      next.add(idx);
+    }
     setExpandedObjections(next);
   };
 
@@ -85,11 +88,11 @@ export const AnalysisView: React.FC<AnalysisViewProps> = ({ result, files }) => 
     }
     setPlayingAudioId(id);
     try {
-      const bytes = await generatePitchAudio(text, 'Kore');
-      if (!bytes) return;
       if (!audioContextRef.current) {
         audioContextRef.current = new (window.AudioContext || (window as any).webkitAudioContext)({ sampleRate: 24000 });
       }
+      const bytes = await generatePitchAudio(text, 'Kore');
+      if (!bytes) return;
       const buffer = await decodeAudioData(bytes, audioContextRef.current, 24000, 1);
       const source = audioContextRef.current.createBufferSource();
       source.buffer = buffer;
@@ -133,15 +136,15 @@ export const AnalysisView: React.FC<AnalysisViewProps> = ({ result, files }) => 
         </div>
       </section>
 
-      {/* OBJECTION HANDLING BATTLE-DRILL (INTERACTIVE) */}
+      {/* OBJECTION HANDLING BATTLE-DRILL (INTERACTIVE ACCORDION) */}
       <section className="bg-white rounded-[3rem] p-10 shadow-2xl border border-slate-200">
         <div className="flex items-center gap-4 mb-10">
           <div className="p-4 bg-indigo-600 text-white rounded-2xl shadow-xl shadow-indigo-100">
             <ICONS.Security />
           </div>
           <div>
-            <h2 className="text-2xl font-black text-slate-800 tracking-tight">Objection Battle-Drill</h2>
-            <p className="text-sm text-slate-500 font-medium">Click to deconstruct psychological barriers and view articular counters.</p>
+            <h2 className="text-2xl font-black text-slate-800 tracking-tight">Interactive Objection Battle-Drill</h2>
+            <p className="text-sm text-slate-500 font-medium">Click each anticipated barrier to reveal the strategic deconstruction and verbatim counters.</p>
           </div>
         </div>
 
@@ -149,79 +152,111 @@ export const AnalysisView: React.FC<AnalysisViewProps> = ({ result, files }) => 
           {(result.objectionHandling || []).map((obj, idx) => {
             const isExpanded = expandedObjections.has(idx);
             return (
-              <div key={idx} className={`rounded-[2.5rem] border transition-all duration-500 overflow-hidden ${isExpanded ? 'bg-slate-50 border-indigo-200 shadow-xl' : 'bg-white border-slate-100 hover:border-slate-300 shadow-sm'}`}>
+              <div 
+                key={idx} 
+                className={`rounded-[2.5rem] border transition-all duration-500 overflow-hidden ${isExpanded ? 'bg-slate-50 border-indigo-200 shadow-xl' : 'bg-white border-slate-100 hover:border-slate-300 shadow-sm'}`}
+              >
+                {/* Accordion Header */}
                 <button 
                   onClick={() => toggleObjection(idx)}
-                  className="w-full text-left px-10 py-8 flex items-center justify-between group"
+                  className="w-full text-left px-10 py-8 flex items-center justify-between group focus:outline-none"
                 >
                   <div className="flex items-center gap-6 flex-1">
-                    <div className={`w-10 h-10 rounded-full flex items-center justify-center font-black text-sm transition-colors ${isExpanded ? 'bg-indigo-600 text-white' : 'bg-slate-100 text-slate-400 group-hover:bg-slate-200'}`}>
+                    <div className={`w-10 h-10 rounded-full flex items-center justify-center font-black text-sm transition-all ${isExpanded ? 'bg-indigo-600 text-white rotate-12 scale-110' : 'bg-slate-100 text-slate-400 group-hover:bg-slate-200'}`}>
                       {idx + 1}
                     </div>
-                    <span className="text-xl font-black text-slate-800 tracking-tight">{obj.objection}</span>
+                    <span className={`text-xl font-black tracking-tight transition-colors ${isExpanded ? 'text-indigo-600' : 'text-slate-800'}`}>
+                      {obj.objection}
+                    </span>
                   </div>
                   <div className={`transition-transform duration-500 ${isExpanded ? 'rotate-180' : ''}`}>
-                    <svg xmlns="http://www.w3.org/2000/svg" className="w-6 h-6 text-slate-400" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                    <svg xmlns="http://www.w3.org/2000/svg" className={`w-6 h-6 ${isExpanded ? 'text-indigo-600' : 'text-slate-300'}`} fill="none" viewBox="0 0 24 24" stroke="currentColor">
                       <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={3} d="M19 9l-7 7-7-7" />
                     </svg>
                   </div>
                 </button>
 
+                {/* Accordion Content */}
                 {isExpanded && (
-                  <div className="px-10 pb-10 pt-2 animate-in slide-in-from-top-4 duration-300">
+                  <div className="px-10 pb-10 pt-2 animate-in slide-in-from-top-4 duration-500">
                     <div className="grid grid-cols-1 lg:grid-cols-2 gap-10">
+                      
+                      {/* Strategic Logic Column */}
                       <div className="space-y-8">
-                        <div>
-                          <h4 className="text-[10px] font-black uppercase tracking-widest text-rose-500 mb-3 flex items-center gap-2">
-                            <ICONS.Brain className="w-4 h-4" /> The "Hidden" Meaning
+                        <div className="group/item">
+                          <h4 className="text-[10px] font-black uppercase tracking-[0.3em] text-rose-500 mb-3 flex items-center gap-2">
+                            <ICONS.Brain className="w-4 h-4" /> Cognitive Decoding: The "Real" Meaning
                           </h4>
-                          <p className="text-lg text-slate-700 font-medium italic leading-relaxed border-l-4 border-rose-100 pl-6">
-                            “{obj.realMeaning}”
-                          </p>
+                          <div className="relative">
+                            <div className="absolute -left-4 top-0 bottom-0 w-1 bg-rose-200 rounded-full group-hover/item:bg-rose-400 transition-colors"></div>
+                            <p className="text-lg text-slate-700 font-black italic leading-relaxed pl-6">
+                              “{obj.realMeaning}”
+                            </p>
+                          </div>
+                          <p className="text-[10px] text-slate-400 font-bold mt-2 pl-6 uppercase tracking-widest italic opacity-60">Psychological Inferred Subtext</p>
                         </div>
-                        <div>
-                          <h4 className="text-[10px] font-black uppercase tracking-widest text-indigo-500 mb-3 flex items-center gap-2">
-                            <ICONS.Trophy className="w-4 h-4" /> Strategic Response Path
+
+                        <div className="group/item">
+                          <h4 className="text-[10px] font-black uppercase tracking-[0.3em] text-indigo-500 mb-3 flex items-center gap-2">
+                            <ICONS.Trophy className="w-4 h-4" /> Response Strategy & Logic Path
                           </h4>
-                          <p className="text-sm text-slate-600 leading-relaxed font-medium">
-                            {obj.strategy}
-                          </p>
+                          <div className="relative">
+                            <div className="absolute -left-4 top-0 bottom-0 w-1 bg-indigo-200 rounded-full group-hover/item:bg-indigo-400 transition-colors"></div>
+                            <p className="text-sm text-slate-600 leading-relaxed font-semibold pl-6">
+                              {obj.strategy}
+                            </p>
+                          </div>
                         </div>
-                        <div className="pt-4 flex items-center gap-4">
+
+                        <div className="pt-2 flex items-center gap-4">
                           <button 
                             onClick={() => scrollToSource(obj.citation)}
-                            className="inline-flex items-center gap-2 px-4 py-2 rounded-full text-[9px] font-black uppercase tracking-widest bg-white border border-slate-200 text-slate-400 hover:text-indigo-600 hover:border-indigo-200 transition-all shadow-sm"
+                            className="inline-flex items-center gap-2 px-5 py-2.5 rounded-full text-[9px] font-black uppercase tracking-widest bg-white border border-slate-200 text-slate-400 hover:text-indigo-600 hover:border-indigo-200 hover:bg-indigo-50 transition-all shadow-sm"
                           >
-                            <ICONS.Shield className="w-3 h-3" /> Grounding Evidence
+                            <ICONS.Shield className="w-3.5 h-3.5" /> Source Document Evidence
                           </button>
                         </div>
                       </div>
 
+                      {/* Articular Pitch Column */}
                       <div className="relative">
-                        <div className="bg-slate-900 rounded-[2.5rem] p-8 shadow-2xl relative overflow-hidden h-full flex flex-col justify-between">
-                          <div className="absolute top-0 right-0 p-8 opacity-10"><ICONS.Speaker className="w-24 h-24 text-white" /></div>
-                          <div className="relative z-10 space-y-4">
-                            <h4 className="text-[9px] font-black uppercase tracking-[0.3em] text-indigo-400">Verbatim Articular Script</h4>
-                            <p className="text-xl font-black italic leading-tight text-white tracking-tight">
+                        <div className="bg-slate-900 rounded-[2.5rem] p-10 shadow-2xl relative overflow-hidden h-full flex flex-col justify-between border border-slate-800">
+                          <div className="absolute -top-4 -right-4 p-12 opacity-5"><ICONS.Speaker className="w-40 h-40 text-white" /></div>
+                          <div className="relative z-10 space-y-5">
+                            <div className="flex items-center gap-3">
+                              <div className="w-1.5 h-6 bg-indigo-500 rounded-full"></div>
+                              <h4 className="text-[9px] font-black uppercase tracking-[0.4em] text-indigo-400">Verbatim Sales Script</h4>
+                            </div>
+                            <p className="text-2xl font-black italic leading-tight text-white tracking-tight">
                               “{obj.exactWording}”
                             </p>
+                            <div className="flex items-center gap-2">
+                              <span className="text-[10px] font-bold text-slate-500 uppercase tracking-widest">Target Tone:</span>
+                              <span className="text-[10px] font-black text-indigo-400 uppercase tracking-widest">{result.snapshot.tone}</span>
+                            </div>
                           </div>
-                          <div className="relative z-10 pt-8 flex items-center gap-3">
+                          
+                          <div className="relative z-10 pt-10 flex flex-col sm:flex-row items-center gap-4">
                             <button 
                               onClick={() => playSnippet(obj.exactWording, `obj-audio-${idx}`)}
-                              className={`flex-1 flex items-center justify-center gap-2 py-3 rounded-xl font-black text-[10px] uppercase tracking-widest transition-all ${playingAudioId === `obj-audio-${idx}` ? 'bg-rose-600 text-white' : 'bg-white text-slate-900 hover:bg-indigo-50'}`}
+                              className={`w-full sm:flex-1 flex items-center justify-center gap-3 py-4 rounded-2xl font-black text-[11px] uppercase tracking-widest transition-all shadow-lg active:scale-95 ${playingAudioId === `obj-audio-${idx}` ? 'bg-rose-600 text-white' : 'bg-white text-slate-900 hover:bg-indigo-50'}`}
                             >
-                              {playingAudioId === `obj-audio-${idx}` ? <><div className="w-2 h-2 bg-white rounded-full animate-ping"></div> Stop Audio</> : <><ICONS.Play className="w-3 h-3" /> Play Pitch</>}
+                              {playingAudioId === `obj-audio-${idx}` ? (
+                                <><div className="w-2 h-2 bg-white rounded-full animate-ping"></div> Stop Playback</>
+                              ) : (
+                                <><ICONS.Play className="w-4 h-4" /> AI Audio Pitch</>
+                              )}
                             </button>
                             <button 
                               onClick={() => copyToClipboard(obj.exactWording, idx)}
-                              className={`px-5 py-3 rounded-xl font-black text-[10px] uppercase tracking-widest transition-all border ${copiedId === idx ? 'bg-emerald-500 border-emerald-500 text-white' : 'bg-slate-800 border-slate-700 text-slate-400 hover:text-white hover:border-slate-500'}`}
+                              className={`w-full sm:w-auto px-8 py-4 rounded-2xl font-black text-[11px] uppercase tracking-widest transition-all border active:scale-95 ${copiedId === idx ? 'bg-emerald-500 border-emerald-500 text-white' : 'bg-slate-800 border-slate-700 text-slate-400 hover:text-white hover:border-slate-500'}`}
                             >
-                              {copiedId === idx ? 'Copied' : 'Copy'}
+                              {copiedId === idx ? 'Copied' : 'Copy Text'}
                             </button>
                           </div>
                         </div>
                       </div>
+
                     </div>
                   </div>
                 )}
