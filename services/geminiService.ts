@@ -178,18 +178,120 @@ export async function generatePitchAudio(text: string, voiceName: string = 'Kore
 
 export async function analyzeSalesContext(filesContent: string, context: MeetingContext): Promise<AnalysisResult> {
   const modelName = 'gemini-3-pro-preview';
-  const response = await ai.models.generateContent({
-    model: modelName,
-    contents: `Analyze this context for a ${context.persona} stakeholder: ${filesContent}`,
-    config: {
-      systemInstruction: `You are a Cognitive AI Sales Strategist. Analyze for unstated psychological drivers.`,
-      responseMimeType: "application/json"
+  const citationSchema = {
+    type: Type.OBJECT,
+    properties: {
+      snippet: { type: Type.STRING },
+      sourceFile: { type: Type.STRING },
     },
-  });
-  return JSON.parse(response.text || "{}") as AnalysisResult;
+    required: ["snippet", "sourceFile"],
+  };
+
+  const responseSchema = {
+    type: Type.OBJECT,
+    properties: {
+      snapshot: {
+        type: Type.OBJECT,
+        properties: {
+          role: { type: Type.STRING },
+          roleCitation: citationSchema,
+          priorities: { type: Type.ARRAY, items: { type: Type.OBJECT, properties: { text: { type: Type.STRING }, citation: citationSchema }, required: ["text", "citation"] } },
+          likelyObjections: { type: Type.ARRAY, items: { type: Type.OBJECT, properties: { text: { type: Type.STRING }, citation: citationSchema }, required: ["text", "citation"] } },
+          decisionStyle: { type: Type.STRING },
+          decisionStyleCitation: citationSchema,
+          riskTolerance: { type: Type.STRING },
+          riskToleranceCitation: citationSchema,
+          tone: { type: Type.STRING },
+        },
+        required: ["role", "roleCitation", "priorities", "likelyObjections", "decisionStyle", "decisionStyleCitation", "riskTolerance", "riskToleranceCitation", "tone"],
+      },
+      documentInsights: {
+        type: Type.OBJECT,
+        properties: {
+          entities: { type: Type.ARRAY, items: { type: Type.OBJECT, properties: { name: { type: Type.STRING }, type: { type: Type.STRING }, context: { type: Type.STRING }, citation: citationSchema }, required: ["name", "type", "context", "citation"] } },
+          structure: { type: Type.OBJECT, properties: { sections: { type: Type.ARRAY, items: { type: Type.STRING } }, keyHeadings: { type: Type.ARRAY, items: { type: Type.STRING } }, detectedTablesSummary: { type: Type.STRING } }, required: ["sections", "keyHeadings", "detectedTablesSummary"] },
+          summaries: {
+            type: Type.ARRAY,
+            items: {
+              type: Type.OBJECT,
+              properties: {
+                fileName: { type: Type.STRING },
+                summary: { type: Type.STRING },
+                strategicImpact: { type: Type.STRING },
+                criticalInsights: { type: Type.ARRAY, items: { type: Type.STRING } }
+              },
+              required: ["fileName", "summary", "strategicImpact", "criticalInsights"]
+            }
+          }
+        },
+        required: ["entities", "structure", "summaries"]
+      },
+      competitiveComparison: {
+        type: Type.ARRAY,
+        items: {
+          type: Type.OBJECT,
+          properties: {
+            name: { type: Type.STRING },
+            overview: { type: Type.STRING },
+            strengths: { type: Type.ARRAY, items: { type: Type.STRING } },
+            weaknesses: { type: Type.ARRAY, items: { type: Type.STRING } },
+            ourWedge: { type: Type.STRING },
+            citation: citationSchema
+          },
+          required: ["name", "overview", "strengths", "weaknesses", "ourWedge", "citation"]
+        }
+      },
+      openingLines: { 
+        type: Type.ARRAY, 
+        items: { 
+          type: Type.OBJECT, 
+          properties: { text: { type: Type.STRING }, label: { type: Type.STRING }, citation: citationSchema }, 
+          required: ["text", "label", "citation"] 
+        } 
+      },
+      predictedQuestions: { type: Type.ARRAY, items: { type: Type.OBJECT, properties: { customerAsks: { type: Type.STRING }, salespersonShouldRespond: { type: Type.STRING }, reasoning: { type: Type.STRING }, category: { type: Type.STRING }, citation: citationSchema }, required: ["customerAsks", "salespersonShouldRespond", "reasoning", "category", "citation"] } },
+      strategicQuestionsToAsk: { type: Type.ARRAY, items: { type: Type.OBJECT, properties: { question: { type: Type.STRING }, whyItMatters: { type: Type.STRING }, citation: citationSchema }, required: ["question", "whyItMatters", "citation"] } },
+      objectionHandling: { type: Type.ARRAY, items: { type: Type.OBJECT, properties: { objection: { type: Type.STRING }, realMeaning: { type: Type.STRING }, strategy: { type: Type.STRING }, exactWording: { type: Type.STRING }, citation: citationSchema }, required: ["objection", "realMeaning", "strategy", "exactWording", "citation"] } },
+      toneGuidance: { type: Type.OBJECT, properties: { wordsToUse: { type: Type.ARRAY, items: { type: Type.STRING } }, wordsToAvoid: { type: Type.ARRAY, items: { type: Type.STRING } }, sentenceLength: { type: Type.STRING }, technicalDepth: { type: Type.STRING } }, required: ["wordsToUse", "wordsToAvoid", "sentenceLength", "technicalDepth"] },
+      finalCoaching: { type: Type.OBJECT, properties: { dos: { type: Type.ARRAY, items: { type: Type.STRING } }, donts: { type: Type.ARRAY, items: { type: Type.STRING } }, finalAdvice: { type: Type.STRING } }, required: ["dos", "donts", "finalAdvice"] }
+    },
+    required: ["snapshot", "documentInsights", "competitiveComparison", "openingLines", "predictedQuestions", "strategicQuestionsToAsk", "objectionHandling", "toneGuidance", "finalCoaching"]
+  };
+
+  const prompt = `Perform a high-fidelity cognitive sales intelligence analysis for: ${context.clientCompany}. 
+  Meeting Context: ${context.meetingFocus}.
+  Solution Domain: ${context.productDomain}.
+  
+  TASK: Synthesize the provided documents into a strategic weapon.
+  COMPETITIVE INTELLIGENCE: Analyze the documents for mentioned or implied competitors. Identify their strengths/weaknesses and define "Our Wedge" (our unique advantage).
+  
+  --- GROUNDING DOCUMENTS --- 
+  ${filesContent}`;
+
+  try {
+    const response = await ai.models.generateContent({
+      model: modelName,
+      contents: prompt,
+      config: {
+        systemInstruction: `You are a Cognitive AI Sales Strategist. Persona: ${context.persona}. Target Solution: ${context.targetProducts}. Analyze for unstated psychological drivers and competitive threats.`,
+        responseMimeType: "application/json",
+        responseSchema,
+        thinkingConfig: { thinkingBudget: 12000 }
+      },
+    });
+    
+    let text = response.text || "{}";
+    const jsonMatch = text.match(/\{[\s\S]*\}/);
+    if (jsonMatch) text = jsonMatch[0];
+    
+    return JSON.parse(text) as AnalysisResult;
+  } catch (error: any) {
+    throw new Error(`Intelligence Analysis Failed: ${error.message}`);
+  }
 }
 
-// FIX: Added VideoStoryboard interface to satisfy VideoGenerator component imports.
+// --- VIDEO GENERATION EXPORTS ---
+
 export interface VideoStoryboard {
   id: string;
   title: string;
@@ -198,55 +300,26 @@ export interface VideoStoryboard {
   veoPrompt: string;
 }
 
-// FIX: Added generateVideoStoryboard to conceptualize cinematic visuals from analysis results.
 export async function generateVideoStoryboard(analysis: AnalysisResult): Promise<VideoStoryboard[]> {
   const modelName = 'gemini-3-flash-preview';
-  const prompt = `Based on this sales analysis of a ${analysis.snapshot.role}, generate 3 distinct cinematic video concepts for a sales explainer. 
-  The concepts should address their priorities: ${analysis.snapshot.priorities.map(p => p.text).join(', ')}.
-  Return exactly 3 concepts in JSON format with fields: id, title, description, angle, veoPrompt. 
-  The 'veoPrompt' should be a detailed visual prompt for a video generation model.`;
-
+  const prompt = `Generate 3 distinct cinematic video concepts based on this sales analysis. Return JSON.`;
   const response = await ai.models.generateContent({
     model: modelName,
     contents: prompt,
-    config: {
-      responseMimeType: "application/json",
-      responseSchema: {
-        type: Type.ARRAY,
-        items: {
-          type: Type.OBJECT,
-          properties: {
-            id: { type: Type.STRING },
-            title: { type: Type.STRING },
-            description: { type: Type.STRING },
-            angle: { type: Type.STRING },
-            veoPrompt: { type: Type.STRING }
-          },
-          required: ["id", "title", "description", "angle", "veoPrompt"]
-        }
-      }
-    }
+    config: { responseMimeType: "application/json" }
   });
   return JSON.parse(response.text || "[]");
 }
 
-// FIX: Added startVideoGeneration using the recommended veo-3.1-fast-generate-preview model.
-// IMPORTANT: Per guidelines, a new GoogleGenAI instance is created right before the API call to ensure latest API key.
 export async function startVideoGeneration(prompt: string, aspectRatio: '16:9' | '9:16') {
   const veoAi = new GoogleGenAI({ apiKey: process.env.API_KEY });
   return await veoAi.models.generateVideos({
     model: 'veo-3.1-fast-generate-preview',
     prompt: prompt,
-    config: {
-      numberOfVideos: 1,
-      resolution: '720p',
-      aspectRatio: aspectRatio
-    }
+    config: { numberOfVideos: 1, resolution: '720p', aspectRatio: aspectRatio }
   });
 }
 
-// FIX: Added getVideoStatus to poll the long-running video generation operation.
-// IMPORTANT: Per guidelines, a new GoogleGenAI instance is created right before the API call.
 export async function getVideoStatus(operation: any) {
   const veoAi = new GoogleGenAI({ apiKey: process.env.API_KEY });
   return await veoAi.operations.getVideosOperation({ operation: operation });

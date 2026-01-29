@@ -34,6 +34,15 @@ export interface DocumentSummary {
   criticalInsights: string[];
 }
 
+export interface CompetitorInsight {
+  name: string;
+  overview: string;
+  strengths: string[];
+  weaknesses: string[];
+  ourWedge: string;
+  citation: Citation;
+}
+
 export interface BuyerSnapshot {
   role: string;
   roleCitation: Citation;
@@ -84,6 +93,7 @@ export interface AnalysisResult {
     structure: DocumentStructure;
     summaries: DocumentSummary[];
   };
+  competitiveComparison: CompetitorInsight[];
   openingLines: OpeningLine[];
   predictedQuestions: QuestionPair[];
   strategicQuestionsToAsk: StrategicQuestion[];
