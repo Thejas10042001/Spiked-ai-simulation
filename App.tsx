@@ -1,4 +1,3 @@
-
 import React, { useState, useCallback, useMemo, useRef } from 'react';
 import { Header } from './components/Header';
 import { FileUpload } from './components/FileUpload';
@@ -8,15 +7,8 @@ import { PracticeSession } from './components/PracticeSession';
 import { CognitiveSearch } from './components/CognitiveSearch';
 import { MeetingContextConfig } from './components/MeetingContextConfig';
 import { analyzeSalesContext } from './services/geminiService';
-import { AnalysisResult, UploadedFile, MeetingContext, ThinkingLevel } from './types';
+import { AnalysisResult, UploadedFile, MeetingContext } from './types';
 import { ICONS } from './constants';
-
-const THINKING_LEVEL_MAP: Record<ThinkingLevel, number> = {
-  'Minimal': 0,
-  'Low': 4000,
-  'Medium': 16000,
-  'High': 32768
-};
 
 const App: React.FC = () => {
   const [files, setFiles] = useState<UploadedFile[]>([]);
@@ -38,6 +30,7 @@ const App: React.FC = () => {
     productDomain: "",
     meetingFocus: "",
     persona: "Balanced",
+    // Making requested styles default
     answerStyles: [
       "Sales Points", 
       "Key Statistics", 
@@ -47,9 +40,7 @@ const App: React.FC = () => {
     ],
     executiveSnapshot: "",
     strategicKeywords: [],
-    baseSystemPrompt: "",
-    thinkingLevel: 'Medium',
-    temperature: 1.0
+    baseSystemPrompt: ""
   });
 
   const isAnyFileProcessing = useMemo(() => files.some(f => f.status === 'processing'), [files]);
@@ -70,7 +61,7 @@ const App: React.FC = () => {
 
     const currentHash = generateStateHash();
     
-    // REDUNDANCY CHECK: If data hasn't changed, skip expensive call
+    // REDUNDANCY CHECK: If data hasn't changed, skip expensive call and use retained results
     if (analysis && currentHash === lastAnalyzedHash.current) {
       setActiveTab('strategy');
       return;
@@ -82,12 +73,8 @@ const App: React.FC = () => {
 
     try {
       const combinedContent = readyFiles.map(f => `FILE: ${f.name}\n${f.content}`).join('\n\n');
-      const tuning = {
-        thinkingBudget: THINKING_LEVEL_MAP[meetingContext.thinkingLevel],
-        temperature: meetingContext.temperature
-      };
       
-      const result = await analyzeSalesContext(combinedContent, meetingContext, tuning);
+      const result = await analyzeSalesContext(combinedContent, meetingContext);
       
       setAnalysis(result);
       lastAnalyzedHash.current = currentHash;
@@ -121,7 +108,7 @@ const App: React.FC = () => {
                 Cognitive Sales Strategy Hub
               </h1>
               <p className="text-lg text-slate-500 max-w-2xl mx-auto leading-relaxed">
-                Configure your meeting context and choice neural parameters before synthesizing source documents into a grounded intelligence agent.
+                Analyze buyer documents with a grounded intelligence agent to infer psychology and predict objections.
               </p>
             </div>
 
@@ -133,33 +120,26 @@ const App: React.FC = () => {
               </h3>
               <FileUpload files={files} onFilesChange={setFiles} />
               
-              <div className="mt-12 space-y-8 flex flex-col items-center w-full">
-                
+              <div className="mt-12 flex flex-col items-center">
                 {error && (
                   <div className="bg-rose-50 border border-rose-100 rounded-2xl p-6 mb-8 max-w-xl text-center">
                     <p className="text-rose-600 font-bold mb-2">⚠️ Analysis Interrupted</p>
                     <p className="text-rose-500 text-sm">{error}</p>
                   </div>
                 )}
-                
-                <div className="flex flex-col items-center gap-4">
-                  <button
-                    onClick={runAnalysis}
-                    disabled={readyFilesCount === 0 || isAnyFileProcessing}
-                    className={`
-                      flex items-center gap-3 px-16 py-6 rounded-full font-black text-xl shadow-2xl transition-all
-                      ${(readyFilesCount > 0 && !isAnyFileProcessing)
-                        ? 'bg-indigo-600 text-white hover:bg-indigo-700 hover:scale-105 active:scale-95 cursor-pointer shadow-indigo-200' 
-                        : 'bg-slate-200 text-slate-400 cursor-not-allowed shadow-none'}
-                    `}
-                  >
-                    <ICONS.Brain />
-                    {isAnyFileProcessing ? 'Retaining Documents...' : 'Synthesize Strategy Core'}
-                  </button>
-                  <p className="text-[10px] text-slate-400 font-black uppercase tracking-widest italic">
-                    Analysis will use T={meetingContext.temperature} / B={THINKING_LEVEL_MAP[meetingContext.thinkingLevel]} as configured above
-                  </p>
-                </div>
+                <button
+                  onClick={runAnalysis}
+                  disabled={readyFilesCount === 0 || isAnyFileProcessing}
+                  className={`
+                    flex items-center gap-3 px-12 py-6 rounded-full font-black text-xl shadow-2xl transition-all
+                    ${(readyFilesCount > 0 && !isAnyFileProcessing)
+                      ? 'bg-indigo-600 text-white hover:bg-indigo-700 hover:scale-105 active:scale-95 cursor-pointer shadow-indigo-200' 
+                      : 'bg-slate-200 text-slate-400 cursor-not-allowed shadow-none'}
+                  `}
+                >
+                  <ICONS.Brain />
+                  {isAnyFileProcessing ? 'Retaining Documents...' : 'Synthesize Strategy Core'}
+                </button>
               </div>
             </div>
           </div>
@@ -173,7 +153,7 @@ const App: React.FC = () => {
             </div>
             <div className="text-center">
               <p className="text-2xl font-bold text-slate-800 animate-pulse tracking-tight">{statusMessage}</p>
-              <p className="text-sm text-slate-400 mt-3 font-medium uppercase tracking-[0.2em]">Config: T={meetingContext.temperature} / B={THINKING_LEVEL_MAP[meetingContext.thinkingLevel]}</p>
+              <p className="text-sm text-slate-400 mt-3 font-medium uppercase tracking-[0.2em]">High-Speed Intelligence Engine Online</p>
             </div>
           </div>
         ) : (
@@ -182,7 +162,7 @@ const App: React.FC = () => {
               <div className="flex items-center gap-2 overflow-x-auto no-scrollbar py-2">
                 <TabBtn active={activeTab === 'strategy'} onClick={() => setActiveTab('strategy')} icon={<ICONS.Document />} label="Brief" />
                 <TabBtn active={activeTab === 'search'} onClick={() => setActiveTab('search')} icon={<ICONS.Search />} label="Intelligence" />
-                <TabBtn active={activeTab === 'audio'} onClick={() => setActiveTab('audio'} icon={<ICONS.Speaker />} label="Audio" />
+                <TabBtn active={activeTab === 'audio'} onClick={() => setActiveTab('audio')} icon={<ICONS.Speaker />} label="Audio" />
                 <TabBtn active={activeTab === 'practice'} onClick={() => setActiveTab('practice')} icon={<ICONS.Chat />} label="Live" />
                 <TabBtn active={activeTab === 'context'} onClick={() => setActiveTab('context')} icon={<ICONS.Efficiency />} label="Config" />
               </div>
