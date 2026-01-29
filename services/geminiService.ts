@@ -1,4 +1,3 @@
-
 import { GoogleGenAI, Type, Modality } from "@google/genai";
 import { AnalysisResult, MeetingContext, ThinkingLevel, VideoStoryboard } from "../types";
 
@@ -42,7 +41,7 @@ export async function performVisionOcr(base64Data: string, mimeType: string): Pr
 export interface CognitiveSearchResult {
   answer: string;
   briefExplanation: string;
-  articularSoundbite: string; // Verbatim one-liner for the seller
+  articularSoundbite: string; 
   psychologicalProjection: {
     buyerFear: string;
     buyerIncentive: string;
@@ -58,7 +57,7 @@ export interface CognitiveSearchResult {
 
 /**
  * Performs a deeply grounded search utilizing full meeting context.
- * Enforces specific response styles as explicit Markdown headers.
+ * Enforces specific response styles as mandatory Markdown headers.
  */
 export async function performCognitiveSearch(
   question: string, 
@@ -67,32 +66,29 @@ export async function performCognitiveSearch(
 ): Promise<CognitiveSearchResult> {
   const modelName = 'gemini-3-pro-preview';
   
-  const keywordsStr = context.strategicKeywords?.length > 0 
-    ? `STRATEGIC ANCHORS (Use these terms where appropriate): ${context.strategicKeywords.join(', ')}` 
-    : "";
+  // Mandatory headers based on user configuration
+  const mandatoryStyles = context.answerStyles.length > 0 
+    ? context.answerStyles 
+    : ["Strategic Analysis", "Grounded Evidence"];
 
-  const stylesStr = context.answerStyles.length > 0 
-    ? context.answerStyles.map(style => `### ${style}`).join('\n') 
-    : "### Strategic Analysis";
+  const styleDirectives = mandatoryStyles.map(style => `- Create a section exactly titled "### ${style}"`).join('\n');
 
   const prompt = `MEETING INTELLIGENCE CONTEXT:
   - Seller: ${context.sellerNames} from ${context.sellerCompany}
   - Prospect: ${context.clientNames} from ${context.clientCompany}
-  - Target Solution: ${context.targetProducts} (${context.productDomain})
-  - Persona Profile: ${context.persona} (This stakeholder values ${context.persona === 'Financial' ? 'ROI and fiscal risk mitigation' : context.persona === 'Technical' ? 'scalability, architecture, and stability' : 'strategic market positioning and execution'}).
-  - Meeting Core Focus: ${context.meetingFocus}
+  - Persona Profile: ${context.persona} (Focus: ${context.persona === 'Financial' ? 'Fiscal ROI' : context.persona === 'Technical' ? 'Systems Integrity' : 'Business Velocity'})
+  - Focus: ${context.meetingFocus}
   
-  ${keywordsStr}
-
-  TASK: Generate a COGNITIVE ARTICULAR response to the inquiry: "${question}".
+  TASK: Synthesize a COGNITIVE ARTICULAR response to: "${question}".
   
-  COGNITIVE ARCHITECTURE REQUIREMENTS:
-  1. HIGH-DENSITY ARTICULATION: Speak in the professional dialect of the ${context.persona}. Use precise terminology, avoiding generic sales fluff.
-  2. DYNAMIC STRUCTURING: You MUST organize the "answer" field using the following Strategic Response Styles as explicit Markdown (###) headers:
-  ${stylesStr}
+  STRATEGIC OUTPUT STRUCTURE (MANDATORY):
+  You MUST organize the "answer" field using the following headers in order:
+  ${styleDirectives}
 
-  3. ARTICULAR SOUNDBITE: Provide a punchy, 10-word verbatim sentence for the seller.
-  4. PSYCHOLOGICAL PROJECTION: Map the internal emotional landscape (Fear vs. Incentive).
+  COGNITIVE REQUIREMENTS:
+  1. Use "High-Density Articulation": Precise, dense professional language. No fluff.
+  2. Ground every single claim in the provided document content.
+  3. Ensure each section header matches the user's configuration exactly.
 
   DOCUMENT SOURCE DATA:
   ${filesContent || "No documents provided."}
@@ -104,15 +100,15 @@ export async function performCognitiveSearch(
       model: modelName,
       contents: prompt,
       config: {
-        systemInstruction: context.baseSystemPrompt || `You are Avi from Spiked, a world-class Sales Strategist. Your goal is to make the salesperson sound like the smartest person in the room through "Cognitive Articulation". Always use the user's selected styles as explicit section headers.`,
+        systemInstruction: context.baseSystemPrompt || `You are a world-class Sales Intelligence Agent. Your goal is to provide highly structured, persona-aligned strategic answers that use the user's selected styles as explicit section headers.`,
         responseMimeType: "application/json",
         temperature: context.temperature,
         thinkingConfig: { thinkingBudget: THINKING_LEVEL_MAP[context.thinkingLevel] },
         responseSchema: {
           type: Type.OBJECT,
           properties: {
-            answer: { type: Type.STRING },
-            briefExplanation: { type: Type.STRING },
+            answer: { type: Type.STRING, description: "Markdown text with specific user-defined headers" },
+            briefExplanation: { type: Type.STRING, description: "A high-level 2-sentence executive summary" },
             articularSoundbite: { type: Type.STRING },
             psychologicalProjection: {
               type: Type.OBJECT,
@@ -151,7 +147,7 @@ export async function performCognitiveSearch(
     
     return JSON.parse(response.text || "{}");
   } catch (error: any) {
-    throw new Error("Cognitive articulation failed.");
+    throw new Error("Cognitive articulation engine encountered a synthesis error.");
   }
 }
 
