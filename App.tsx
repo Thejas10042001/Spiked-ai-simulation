@@ -7,8 +7,15 @@ import { PracticeSession } from './components/PracticeSession';
 import { CognitiveSearch } from './components/CognitiveSearch';
 import { MeetingContextConfig } from './components/MeetingContextConfig';
 import { analyzeSalesContext } from './services/geminiService';
-import { AnalysisResult, UploadedFile, MeetingContext } from './types';
+import { AnalysisResult, UploadedFile, MeetingContext, ThinkingLevel } from './types';
 import { ICONS } from './constants';
+
+const THINKING_LEVEL_MAP: Record<ThinkingLevel, number> = {
+  'Minimal': 0,
+  'Low': 4000,
+  'Medium': 16000,
+  'High': 32768
+};
 
 const App: React.FC = () => {
   const [files, setFiles] = useState<UploadedFile[]>([]);
@@ -30,7 +37,8 @@ const App: React.FC = () => {
     productDomain: "",
     meetingFocus: "",
     persona: "Balanced",
-    // Making requested styles default
+    thinkingLevel: "Medium",
+    temperature: 1.0,
     answerStyles: [
       "Sales Points", 
       "Key Statistics", 
@@ -108,7 +116,7 @@ const App: React.FC = () => {
                 Cognitive Sales Strategy Hub
               </h1>
               <p className="text-lg text-slate-500 max-w-2xl mx-auto leading-relaxed">
-                Analyze buyer documents with a grounded intelligence agent to infer psychology and predict objections.
+                Configure your strategic parameters and tune neural logic before synthesizing document-grounded intelligence.
               </p>
             </div>
 
@@ -120,26 +128,31 @@ const App: React.FC = () => {
               </h3>
               <FileUpload files={files} onFilesChange={setFiles} />
               
-              <div className="mt-12 flex flex-col items-center">
+              <div className="mt-12 flex flex-col items-center gap-6">
                 {error && (
                   <div className="bg-rose-50 border border-rose-100 rounded-2xl p-6 mb-8 max-w-xl text-center">
                     <p className="text-rose-600 font-bold mb-2">⚠️ Analysis Interrupted</p>
                     <p className="text-rose-500 text-sm">{error}</p>
                   </div>
                 )}
-                <button
-                  onClick={runAnalysis}
-                  disabled={readyFilesCount === 0 || isAnyFileProcessing}
-                  className={`
-                    flex items-center gap-3 px-12 py-6 rounded-full font-black text-xl shadow-2xl transition-all
-                    ${(readyFilesCount > 0 && !isAnyFileProcessing)
-                      ? 'bg-indigo-600 text-white hover:bg-indigo-700 hover:scale-105 active:scale-95 cursor-pointer shadow-indigo-200' 
-                      : 'bg-slate-200 text-slate-400 cursor-not-allowed shadow-none'}
-                  `}
-                >
-                  <ICONS.Brain />
-                  {isAnyFileProcessing ? 'Retaining Documents...' : 'Synthesize Strategy Core'}
-                </button>
+                <div className="flex flex-col items-center gap-4">
+                  <button
+                    onClick={runAnalysis}
+                    disabled={readyFilesCount === 0 || isAnyFileProcessing}
+                    className={`
+                      flex items-center gap-3 px-16 py-6 rounded-full font-black text-xl shadow-2xl transition-all
+                      ${(readyFilesCount > 0 && !isAnyFileProcessing)
+                        ? 'bg-indigo-600 text-white hover:bg-indigo-700 hover:scale-105 active:scale-95 cursor-pointer shadow-indigo-200' 
+                        : 'bg-slate-200 text-slate-400 cursor-not-allowed shadow-none'}
+                    `}
+                  >
+                    <ICONS.Brain />
+                    {isAnyFileProcessing ? 'Retaining Documents...' : 'Synthesize Strategy Core'}
+                  </button>
+                  <p className="text-[10px] text-slate-400 font-black uppercase tracking-widest italic">
+                    Analysis will use T={meetingContext.temperature.toFixed(2)} / B={THINKING_LEVEL_MAP[meetingContext.thinkingLevel].toLocaleString()}
+                  </p>
+                </div>
               </div>
             </div>
           </div>
@@ -153,7 +166,7 @@ const App: React.FC = () => {
             </div>
             <div className="text-center">
               <p className="text-2xl font-bold text-slate-800 animate-pulse tracking-tight">{statusMessage}</p>
-              <p className="text-sm text-slate-400 mt-3 font-medium uppercase tracking-[0.2em]">High-Speed Intelligence Engine Online</p>
+              <p className="text-sm text-slate-400 mt-3 font-medium uppercase tracking-[0.2em]">Config: T={meetingContext.temperature.toFixed(2)} / B={THINKING_LEVEL_MAP[meetingContext.thinkingLevel].toLocaleString()}</p>
             </div>
           </div>
         ) : (

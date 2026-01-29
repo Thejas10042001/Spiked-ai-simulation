@@ -86,6 +86,15 @@ export interface OpeningLine {
   citation: Citation;
 }
 
+// Added VideoStoryboard interface to support video generation concepts
+export interface VideoStoryboard {
+  id: string;
+  title: string;
+  description: string;
+  angle: string;
+  veoPrompt: string;
+}
+
 export interface AnalysisResult {
   snapshot: BuyerSnapshot;
   documentInsights: {
@@ -120,6 +129,8 @@ export interface UploadedFile {
 
 export type CustomerPersonaType = 'Balanced' | 'Technical' | 'Financial' | 'Business Executives';
 
+export type ThinkingLevel = 'Minimal' | 'Low' | 'Medium' | 'High';
+
 export interface MeetingContext {
   sellerCompany: string;
   sellerNames: string;
@@ -133,4 +144,6 @@ export interface MeetingContext {
   executiveSnapshot: string;
   strategicKeywords: string[];
   baseSystemPrompt: string;
+  thinkingLevel: ThinkingLevel;
+  temperature: number;
 }

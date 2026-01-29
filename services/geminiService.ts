@@ -1,7 +1,15 @@
+
 import { GoogleGenAI, Type, Modality } from "@google/genai";
-import { AnalysisResult, MeetingContext } from "../types";
+import { AnalysisResult, MeetingContext, ThinkingLevel, VideoStoryboard } from "../types";
 
 const ai = new GoogleGenAI({ apiKey: process.env.API_KEY });
+
+const THINKING_LEVEL_MAP: Record<ThinkingLevel, number> = {
+  'Minimal': 0,
+  'Low': 4000,
+  'Medium': 16000,
+  'High': 32768
+};
 
 /**
  * Advanced Semantic OCR using Gemini 3 Pro.
@@ -48,7 +56,11 @@ export interface CognitiveSearchResult {
   };
 }
 
-export async function performCognitiveSearch(question: string, filesContent: string, context: MeetingContext): Promise<CognitiveSearchResult> {
+export async function performCognitiveSearch(
+  question: string, 
+  filesContent: string, 
+  context: MeetingContext
+): Promise<CognitiveSearchResult> {
   const modelName = 'gemini-3-pro-preview';
   
   const prompt = `MEETING INTELLIGENCE CONTEXT:
@@ -79,8 +91,10 @@ export async function performCognitiveSearch(question: string, filesContent: str
       model: modelName,
       contents: prompt,
       config: {
-        systemInstruction: `You are Avi from Spiked, a world-class Sales Strategist. Your goal is to make the salesperson sound like the smartest person in the room by providing "Cognitive Articulation" — the ability to speak to the buyer's hidden professional motivations.`,
+        systemInstruction: context.baseSystemPrompt || `You are Avi from Spiked, a world-class Sales Strategist. Your goal is to make the salesperson sound like the smartest person in the room by providing "Cognitive Articulation" — the ability to speak to the buyer's hidden professional motivations.`,
         responseMimeType: "application/json",
+        temperature: context.temperature,
+        thinkingConfig: { thinkingBudget: THINKING_LEVEL_MAP[context.thinkingLevel] },
         responseSchema: {
           type: Type.OBJECT,
           properties: {
@@ -263,14 +277,6 @@ export async function analyzeSalesContext(filesContent: string, context: Meeting
   
   TASK: Synthesize the provided documents into a strategic weapon.
   
-  COMPETITIVE INTELLIGENCE REQUIREMENTS: 
-  - Analyze documents for ANY direct or indirect competitors mentioned or implied.
-  - For each competitor, provide:
-    1. A brief overview of their market position.
-    2. Strengths relative to our solution.
-    3. Weaknesses relative to our solution.
-    4. "Our Wedge": The specific articular logic a salesperson should use to win against this competitor based on document context.
-  
   --- GROUNDING DOCUMENTS --- 
   ${filesContent}`;
 
@@ -279,10 +285,11 @@ export async function analyzeSalesContext(filesContent: string, context: Meeting
       model: modelName,
       contents: prompt,
       config: {
-        systemInstruction: `You are a Cognitive AI Sales Strategist. Persona: ${context.persona}. Target Solution: ${context.targetProducts}. Analyze for unstated psychological drivers and competitive threats.`,
+        systemInstruction: context.baseSystemPrompt || `You are a Cognitive AI Sales Strategist. Persona: ${context.persona}. Target Solution: ${context.targetProducts}.`,
         responseMimeType: "application/json",
         responseSchema,
-        thinkingConfig: { thinkingBudget: 12000 }
+        temperature: context.temperature,
+        thinkingConfig: { thinkingBudget: THINKING_LEVEL_MAP[context.thinkingLevel] }
       },
     });
     
@@ -296,23 +303,31 @@ export async function analyzeSalesContext(filesContent: string, context: Meeting
   }
 }
 
-// --- VIDEO GENERATION EXPORTS ---
-
-export interface VideoStoryboard {
-  id: string;
-  title: string;
-  description: string;
-  angle: string;
-  veoPrompt: string;
-}
-
+// Fixed generateVideoStoryboard with VideoStoryboard type and responseSchema
 export async function generateVideoStoryboard(analysis: AnalysisResult): Promise<VideoStoryboard[]> {
   const modelName = 'gemini-3-flash-preview';
-  const prompt = `Generate 3 distinct cinematic video concepts based on this sales analysis. Return JSON.`;
+  const prompt = `Generate 3 distinct cinematic video concepts based on this sales analysis. Return JSON array.`;
   const response = await ai.models.generateContent({
     model: modelName,
     contents: prompt,
-    config: { responseMimeType: "application/json" }
+    config: { 
+      responseMimeType: "application/json",
+      responseSchema: {
+        type: Type.ARRAY,
+        items: {
+          type: Type.OBJECT,
+          properties: {
+            id: { type: Type.STRING },
+            title: { type: Type.STRING },
+            description: { type: Type.STRING },
+            angle: { type: Type.STRING },
+            veoPrompt: { type: Type.STRING },
+          },
+          required: ["id", "title", "description", "angle", "veoPrompt"],
+          propertyOrdering: ["id", "title", "description", "angle", "veoPrompt"],
+        }
+      }
+    }
   });
   return JSON.parse(response.text || "[]");
 }

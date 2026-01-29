@@ -1,7 +1,8 @@
+
 import React, { useState, useEffect, useMemo } from 'react';
-import { AnalysisResult } from '../types';
+import { AnalysisResult, VideoStoryboard } from '../types';
 import { ICONS } from '../constants';
-import { startVideoGeneration, getVideoStatus, generateVideoStoryboard, VideoStoryboard } from '../services/geminiService';
+import { startVideoGeneration, getVideoStatus, generateVideoStoryboard } from '../services/geminiService';
 
 interface VideoGeneratorProps {
   analysis: AnalysisResult;
