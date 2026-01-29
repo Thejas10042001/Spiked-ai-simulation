@@ -1,4 +1,3 @@
-
 import { GoogleGenAI, Type, Modality } from "@google/genai";
 import { AnalysisResult, MeetingContext } from "../types";
 
@@ -183,7 +182,11 @@ export async function generatePitchAudio(text: string, voiceName: string = 'Kore
   return base64Audio ? decode(base64Audio) : null;
 }
 
-export async function analyzeSalesContext(filesContent: string, context: MeetingContext): Promise<AnalysisResult> {
+export async function analyzeSalesContext(
+  filesContent: string, 
+  context: MeetingContext,
+  tuning: { thinkingBudget: number, temperature: number }
+): Promise<AnalysisResult> {
   const modelName = 'gemini-3-pro-preview';
   const citationSchema = {
     type: Type.OBJECT,
@@ -290,7 +293,8 @@ export async function analyzeSalesContext(filesContent: string, context: Meeting
         systemInstruction: `You are a Cognitive AI Sales Strategist. Persona: ${context.persona}. Target Solution: ${context.targetProducts}. Analyze for unstated psychological drivers and competitive threats.`,
         responseMimeType: "application/json",
         responseSchema,
-        thinkingConfig: { thinkingBudget: 12000 }
+        temperature: tuning.temperature,
+        thinkingConfig: { thinkingBudget: tuning.thinkingBudget }
       },
     });
     
