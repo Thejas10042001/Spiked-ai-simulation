@@ -1,4 +1,3 @@
-
 import { GoogleGenAI, Type, Modality } from "@google/genai";
 import { AnalysisResult, MeetingContext, ThinkingLevel, VideoStoryboard } from "../types";
 
@@ -63,15 +62,21 @@ export async function performCognitiveSearch(
 ): Promise<CognitiveSearchResult> {
   const modelName = 'gemini-3-pro-preview';
   
+  // Refined prompt to enforce the strategic response styles as headers
   const prompt = `MEETING INTELLIGENCE CONTEXT:
   Seller: ${context.sellerNames} (${context.sellerCompany})
   Client Stakeholder: ${context.clientNames} (${context.clientCompany})
-  Target Persona: ${context.persona} (This stakeholder is driven by ${context.persona === 'Financial' ? 'ROI and risk' : context.persona === 'Technical' ? 'stability and performance' : 'strategic growth'}).
+  Target Persona: ${context.persona}
   Meeting Focus: ${context.meetingFocus}
-  Solution: ${context.targetProducts}
+  
+  STRATEGIC ENCODING REQUIREMENTS:
+  You MUST organize the "answer" field using the following Strategic Response Styles as explicit section headers:
+  ${context.answerStyles.length > 0 ? context.answerStyles.map(style => `### ${style}`).join('\n') : "### Strategic Analysis"}
 
   TASK: Synthesize a COGNITIVE ARTICULAR RESPONSE. 
-  Don't just summarize; simulate how this stakeholder will perceive the information emotionally and professionally.
+  1. Use "High-Density Articulation": Precise, professional, and grounded.
+  2. For each requested section style header, provide the relevant intelligence briefly but deeply.
+  3. Simulate how this stakeholder perceives the logic.
 
   DOCUMENT SOURCE DATA:
   ${filesContent || "No documents provided."}
@@ -79,10 +84,10 @@ export async function performCognitiveSearch(
   QUESTION: ${question}
 
   RESPONSE REQUIREMENTS:
-  1. "answer": A detailed, grounded analysis using the "Sales Strategy Points" and "Technical Glossary" blocks as needed.
-  2. "briefExplanation": A 2-sentence high-density executive summary.
-  3. "articularSoundbite": A punchy, 10-word verbatim sentence the salesperson should say right now to sound highly articular.
-  4. "psychologicalProjection": Map the unstated subtext. What is this buyer AFRAID of in this answer? What is their INCENTIVE?
+  - "answer": The structured response using the headers requested above. Use Markdown for sections.
+  - "briefExplanation": A 2-sentence executive summary.
+  - "articularSoundbite": A punchy, 10-word verbatim sentence for the seller.
+  - "psychologicalProjection": Mapping of Fear, Incentive, and Lever.
 
   Return as JSON.`;
 
@@ -91,7 +96,7 @@ export async function performCognitiveSearch(
       model: modelName,
       contents: prompt,
       config: {
-        systemInstruction: context.baseSystemPrompt || `You are Avi from Spiked, a world-class Sales Strategist. Your goal is to make the salesperson sound like the smartest person in the room by providing "Cognitive Articulation" — the ability to speak to the buyer's hidden professional motivations.`,
+        systemInstruction: context.baseSystemPrompt || `You are Avi from Spiked, a world-class Sales Strategist. Provide "Cognitive Articulation" — speaking to the buyer's hidden professional motivations using the user's selected styles.`,
         responseMimeType: "application/json",
         temperature: context.temperature,
         thinkingConfig: { thinkingBudget: THINKING_LEVEL_MAP[context.thinkingLevel] },

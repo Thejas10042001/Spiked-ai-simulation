@@ -4,27 +4,36 @@ import { ICONS } from '../constants';
 import { performCognitiveSearch, generateDynamicSuggestions, CognitiveSearchResult } from '../services/geminiService';
 import { UploadedFile, MeetingContext } from '../types';
 
-interface CognitiveSearchProps {
-  files: UploadedFile[];
-  context: MeetingContext;
-}
-
 const FormattedText: React.FC<{ text: string }> = ({ text }) => {
   const lines = text.split('\n');
   return (
-    <div className="space-y-6 text-slate-700 leading-relaxed text-lg font-serif">
+    <div className="space-y-8 text-slate-700 leading-relaxed text-lg font-serif">
       {lines.map((line, idx) => {
         const trimmed = line.trim();
         if (!trimmed) return <div key={idx} className="h-4" />;
+
+        // Detect Style Headers (e.g., ### Executive Summary)
+        if (trimmed.startsWith('### ')) {
+          const title = trimmed.replace('### ', '');
+          return (
+            <div key={idx} className="pt-8 pb-4 border-b border-slate-100 mb-4 animate-in fade-in slide-in-from-left-4">
+              <div className="flex items-center gap-3">
+                <div className="w-1.5 h-6 bg-indigo-600 rounded-full"></div>
+                <h4 className="text-[12px] font-black uppercase tracking-[0.3em] text-slate-900">{title}</h4>
+              </div>
+            </div>
+          );
+        }
+
         const isBullet = trimmed.startsWith('- ') || trimmed.startsWith('* ');
         return (
-          <div key={idx} className={isBullet ? "flex gap-5 pl-8 border-l-4 border-indigo-100 py-2" : "py-1"}>
-            {isBullet && <div className="mt-2.5 w-2 h-2 rounded-full bg-indigo-500 shadow-sm shrink-0"></div>}
+          <div key={idx} className={isBullet ? "flex gap-5 pl-8 border-l-4 border-indigo-50 py-2" : "py-1"}>
+            {isBullet && <div className="mt-2.5 w-2 h-2 rounded-full bg-indigo-400 shadow-sm shrink-0"></div>}
             <div className="flex-1">
               {trimmed.split(/(\*\*.*?\*\*|\*.*?\*)/g).map((part, i) => {
                 if (part.startsWith('**') && part.endsWith('**')) {
                   const inner = part.slice(2, -2);
-                  return <strong key={i} className="font-extrabold text-slate-900 bg-indigo-50/30 px-1 rounded">{inner}</strong>;
+                  return <strong key={i} className="font-extrabold text-slate-900 bg-indigo-50/50 px-1.5 rounded">{inner}</strong>;
                 }
                 if (part.startsWith('*') && part.endsWith('*')) {
                   return <em key={i} className="italic text-indigo-600 font-medium">{part.slice(1, -1)}</em>;
@@ -38,6 +47,12 @@ const FormattedText: React.FC<{ text: string }> = ({ text }) => {
     </div>
   );
 };
+
+// Added missing interface for CognitiveSearch props
+interface CognitiveSearchProps {
+  files: UploadedFile[];
+  context: MeetingContext;
+}
 
 export const CognitiveSearch: React.FC<CognitiveSearchProps> = ({ files, context }) => {
   const [query, setQuery] = useState("");
@@ -139,9 +154,20 @@ export const CognitiveSearch: React.FC<CognitiveSearchProps> = ({ files, context
 
           {/* DETAILED ARTICULATION */}
           <div className="bg-white rounded-[4rem] p-16 shadow-2xl border border-slate-200 relative">
-            <div className="flex items-center gap-4 mb-12">
-               <div className="p-3 bg-slate-900 text-white rounded-2xl"><ICONS.Brain /></div>
-               <h3 className="text-[12px] font-black uppercase tracking-[0.4em] text-slate-900">Cognitive Answering Model</h3>
+            <div className="flex flex-col md:flex-row md:items-center justify-between gap-6 mb-12 border-b border-slate-100 pb-10">
+               <div className="flex items-center gap-4">
+                  <div className="p-3 bg-slate-900 text-white rounded-2xl"><ICONS.Brain /></div>
+                  <h3 className="text-[12px] font-black uppercase tracking-[0.4em] text-slate-900">Neural Answering Core</h3>
+               </div>
+               
+               <div className="flex flex-wrap gap-2 justify-end">
+                  <span className="text-[9px] font-black text-slate-400 uppercase tracking-widest mr-2 py-2">Active Strategic Encodings:</span>
+                  {context.answerStyles.map((style, i) => (
+                    <span key={i} className="px-3 py-1.5 bg-indigo-50 text-indigo-600 rounded-lg text-[9px] font-black uppercase tracking-widest border border-indigo-100 animate-in zoom-in duration-300">
+                      {style}
+                    </span>
+                  ))}
+               </div>
             </div>
             
             <FormattedText text={result.answer} />
