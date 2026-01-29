@@ -1,3 +1,4 @@
+
 import { GoogleGenAI, Type, Modality } from "@google/genai";
 import { AnalysisResult, MeetingContext, ThinkingLevel, VideoStoryboard } from "../types";
 
@@ -55,6 +56,10 @@ export interface CognitiveSearchResult {
   };
 }
 
+/**
+ * Performs a deeply grounded search utilizing full meeting context.
+ * Enforces specific response styles as explicit Markdown headers.
+ */
 export async function performCognitiveSearch(
   question: string, 
   filesContent: string, 
@@ -62,41 +67,44 @@ export async function performCognitiveSearch(
 ): Promise<CognitiveSearchResult> {
   const modelName = 'gemini-3-pro-preview';
   
-  // Refined prompt to enforce the strategic response styles as headers
-  const prompt = `MEETING INTELLIGENCE CONTEXT:
-  Seller: ${context.sellerNames} (${context.sellerCompany})
-  Client Stakeholder: ${context.clientNames} (${context.clientCompany})
-  Target Persona: ${context.persona}
-  Meeting Focus: ${context.meetingFocus}
-  
-  STRATEGIC ENCODING REQUIREMENTS:
-  You MUST organize the "answer" field using the following Strategic Response Styles as explicit section headers:
-  ${context.answerStyles.length > 0 ? context.answerStyles.map(style => `### ${style}`).join('\n') : "### Strategic Analysis"}
+  const keywordsStr = context.strategicKeywords?.length > 0 
+    ? `STRATEGIC ANCHORS (Use these terms where appropriate): ${context.strategicKeywords.join(', ')}` 
+    : "";
 
-  TASK: Synthesize a COGNITIVE ARTICULAR RESPONSE. 
-  1. Use "High-Density Articulation": Precise, professional, and grounded.
-  2. For each requested section style header, provide the relevant intelligence briefly but deeply.
-  3. Simulate how this stakeholder perceives the logic.
+  const stylesStr = context.answerStyles.length > 0 
+    ? context.answerStyles.map(style => `### ${style}`).join('\n') 
+    : "### Strategic Analysis";
+
+  const prompt = `MEETING INTELLIGENCE CONTEXT:
+  - Seller: ${context.sellerNames} from ${context.sellerCompany}
+  - Prospect: ${context.clientNames} from ${context.clientCompany}
+  - Target Solution: ${context.targetProducts} (${context.productDomain})
+  - Persona Profile: ${context.persona} (This stakeholder values ${context.persona === 'Financial' ? 'ROI and fiscal risk mitigation' : context.persona === 'Technical' ? 'scalability, architecture, and stability' : 'strategic market positioning and execution'}).
+  - Meeting Core Focus: ${context.meetingFocus}
+  
+  ${keywordsStr}
+
+  TASK: Generate a COGNITIVE ARTICULAR response to the inquiry: "${question}".
+  
+  COGNITIVE ARCHITECTURE REQUIREMENTS:
+  1. HIGH-DENSITY ARTICULATION: Speak in the professional dialect of the ${context.persona}. Use precise terminology, avoiding generic sales fluff.
+  2. DYNAMIC STRUCTURING: You MUST organize the "answer" field using the following Strategic Response Styles as explicit Markdown (###) headers:
+  ${stylesStr}
+
+  3. ARTICULAR SOUNDBITE: Provide a punchy, 10-word verbatim sentence for the seller.
+  4. PSYCHOLOGICAL PROJECTION: Map the internal emotional landscape (Fear vs. Incentive).
 
   DOCUMENT SOURCE DATA:
   ${filesContent || "No documents provided."}
 
-  QUESTION: ${question}
-
-  RESPONSE REQUIREMENTS:
-  - "answer": The structured response using the headers requested above. Use Markdown for sections.
-  - "briefExplanation": A 2-sentence executive summary.
-  - "articularSoundbite": A punchy, 10-word verbatim sentence for the seller.
-  - "psychologicalProjection": Mapping of Fear, Incentive, and Lever.
-
-  Return as JSON.`;
+  RESPONSE FORMAT: JSON`;
 
   try {
     const response = await ai.models.generateContent({
       model: modelName,
       contents: prompt,
       config: {
-        systemInstruction: context.baseSystemPrompt || `You are Avi from Spiked, a world-class Sales Strategist. Provide "Cognitive Articulation" — speaking to the buyer's hidden professional motivations using the user's selected styles.`,
+        systemInstruction: context.baseSystemPrompt || `You are Avi from Spiked, a world-class Sales Strategist. Your goal is to make the salesperson sound like the smartest person in the room through "Cognitive Articulation". Always use the user's selected styles as explicit section headers.`,
         responseMimeType: "application/json",
         temperature: context.temperature,
         thinkingConfig: { thinkingBudget: THINKING_LEVEL_MAP[context.thinkingLevel] },
@@ -149,7 +157,7 @@ export async function performCognitiveSearch(
 
 export async function generateDynamicSuggestions(filesContent: string, context: MeetingContext): Promise<string[]> {
   const modelName = 'gemini-3-flash-preview';
-  const prompt = `Suggest 3 strategic questions to ask our AI for a ${context.persona} stakeholder at ${context.clientCompany} regarding ${context.meetingFocus}. Return as JSON array.`;
+  const prompt = `Suggest 3 strategic questions for a ${context.persona} stakeholder at ${context.clientCompany} regarding ${context.meetingFocus}. Return as JSON array.`;
   const response = await ai.models.generateContent({ model: modelName, contents: prompt, config: { responseMimeType: "application/json" } });
   return JSON.parse(response.text || "[]");
 }
@@ -176,7 +184,7 @@ export async function decodeAudioData(data: Uint8Array, ctx: AudioContext, sampl
 export async function generateExplanation(question: string, context: AnalysisResult): Promise<string> {
   const response = await ai.models.generateContent({
     model: 'gemini-3-flash-preview',
-    contents: `Explain this sales strategy question: "${question}" based on: ${JSON.stringify(context.snapshot)}`,
+    contents: `Briefly explain this sales strategy question: "${question}" based on: ${JSON.stringify(context.snapshot)}`,
   });
   return response.text || "";
 }
@@ -279,8 +287,12 @@ export async function analyzeSalesContext(filesContent: string, context: Meeting
   const prompt = `Perform a high-fidelity cognitive sales intelligence analysis for: ${context.clientCompany}. 
   Meeting Context: ${context.meetingFocus}.
   Solution Domain: ${context.productDomain}.
+  Target Stakeholder Persona: ${context.persona}.
   
   TASK: Synthesize the provided documents into a strategic weapon.
+  - Model the ${context.persona}'s likely internal narrative.
+  - Predict objections specific to ${context.meetingFocus}.
+  - Use high-density Articular logic throughout.
   
   --- GROUNDING DOCUMENTS --- 
   ${filesContent}`;
@@ -290,7 +302,7 @@ export async function analyzeSalesContext(filesContent: string, context: Meeting
       model: modelName,
       contents: prompt,
       config: {
-        systemInstruction: context.baseSystemPrompt || `You are a Cognitive AI Sales Strategist. Persona: ${context.persona}. Target Solution: ${context.targetProducts}.`,
+        systemInstruction: context.baseSystemPrompt || `You are a Cognitive AI Sales Strategist. Persona: ${context.persona}. Target Solution: ${context.targetProducts}. Always provide grounded, articular intelligence.`,
         responseMimeType: "application/json",
         responseSchema,
         temperature: context.temperature,
@@ -308,7 +320,6 @@ export async function analyzeSalesContext(filesContent: string, context: Meeting
   }
 }
 
-// Fixed generateVideoStoryboard with VideoStoryboard type and responseSchema
 export async function generateVideoStoryboard(analysis: AnalysisResult): Promise<VideoStoryboard[]> {
   const modelName = 'gemini-3-flash-preview';
   const prompt = `Generate 3 distinct cinematic video concepts based on this sales analysis. Return JSON array.`;
@@ -328,8 +339,7 @@ export async function generateVideoStoryboard(analysis: AnalysisResult): Promise
             angle: { type: Type.STRING },
             veoPrompt: { type: Type.STRING },
           },
-          required: ["id", "title", "description", "angle", "veoPrompt"],
-          propertyOrdering: ["id", "title", "description", "angle", "veoPrompt"],
+          required: ["id", "title", "description", "angle", "veoPrompt"]
         }
       }
     }
