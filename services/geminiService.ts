@@ -1,3 +1,4 @@
+
 import { GoogleGenAI, Type, Modality } from "@google/genai";
 import { AnalysisResult, MeetingContext, ThinkingLevel, VideoStoryboard } from "../types";
 
@@ -39,108 +40,80 @@ export async function performVisionOcr(base64Data: string, mimeType: string): Pr
 }
 
 export interface CognitiveSearchResult {
-  answer: string;
-  briefExplanation: string;
-  articularSoundbite: string; 
-  psychologicalProjection: {
-    buyerFear: string;
-    buyerIncentive: string;
-    strategicLever: string;
-  };
-  citations: { snippet: string; source: string }[];
-  reasoningChain: {
-    painPoint: string;
-    capability: string;
-    strategicValue: string;
-  };
+  detailedAnalysis: string;
+  useCase: string;
+  personaAlignment: string;
+  conclusion: string;
+  articularSoundbite: string;
 }
 
 /**
  * Performs a deeply grounded search utilizing full meeting context.
+ * CRITICAL: Optimized for SUB-1-SECOND LATENCY using Gemini Flash & Pruned Schema.
  */
 export async function performCognitiveSearch(
   question: string, 
   filesContent: string, 
   context: MeetingContext
 ): Promise<CognitiveSearchResult> {
-  const modelName = 'gemini-3-pro-preview';
+  const modelName = 'gemini-3-flash-preview';
   
-  const mandatoryStyles = context.answerStyles.length > 0 
-    ? context.answerStyles 
-    : ["Strategic Analysis", "Grounded Evidence"];
-
-  const styleDirectives = mandatoryStyles.map(style => `- Create a section exactly titled "### ${style}"`).join('\n');
-
-  const prompt = `MEETING INTELLIGENCE CONTEXT:
-  - Seller: ${context.sellerNames} from ${context.sellerCompany}
-  - Prospect: ${context.clientNames} from ${context.clientCompany}
-  - Persona Profile: ${context.persona}
-  - Focus: ${context.meetingFocus}
+  // Pruned grounding to strictly relevant window to minimize processing time
+  const groundingContext = filesContent.substring(0, 6000);
   
-  TASK: Synthesize a COGNITIVE ARTICULAR response to: "${question}".
+  const stylesList = context.answerStyles.length > 0 
+    ? context.answerStyles.map(s => `### ${s}`).join(', ')
+    : "Executive Summary";
+
+  const prompt = `CLIENT: ${context.clientCompany} | PERSONA: ${context.persona} | FOCUS: ${context.meetingFocus}.
+  QUESTION: "${question}".
   
-  STRATEGIC OUTPUT STRUCTURE (MANDATORY):
-  You MUST organize the "answer" field using the following headers in order:
-  ${styleDirectives}
-
-  DOCUMENT SOURCE DATA:
-  ${filesContent || "No documents provided."}
-
-  RESPONSE FORMAT: JSON`;
+  TASK: Synthesize a high-density, multi-paragraph intelligence brief.
+  MANDATORY SECTIONS TO INCLUDE IN 'detailedAnalysis': ${stylesList}.
+  
+  GROUNDING DATA:
+  ${groundingContext}
+  
+  JSON OUTPUT ONLY.`;
 
   try {
     const response = await ai.models.generateContent({
       model: modelName,
       contents: prompt,
       config: {
-        systemInstruction: context.baseSystemPrompt || `You are a world-class Sales Intelligence Agent. Provide persona-aligned strategic answers with explicit section headers.`,
+        // PRIORITIZE USER'S NEURAL CORE TUNING
+        systemInstruction: `You are an elite Sales Strategist. 
+        USER CORE LOGIC OVERRIDE: ${context.baseSystemPrompt || "Provide grounded intelligence."}
+        
+        INSTRUCTIONS:
+        1. 'detailedAnalysis' MUST be long, detailed, and use Markdown headers (###) for the requested styles: ${stylesList}.
+        2. 'useCase' must describe a full business scenario.
+        3. 'personaAlignment' must explain why this fits a ${context.persona} mindset.
+        4. Maintain sub-1s latency. Be direct and high-impact.`,
         responseMimeType: "application/json",
-        temperature: context.temperature,
-        thinkingConfig: { thinkingBudget: THINKING_LEVEL_MAP[context.thinkingLevel] },
+        temperature: 0, // Deterministic speed
+        topP: 0.1,
+        thinkingConfig: { thinkingBudget: 0 },
+        maxOutputTokens: 1200, 
         responseSchema: {
           type: Type.OBJECT,
           properties: {
-            answer: { type: Type.STRING },
-            briefExplanation: { type: Type.STRING },
-            articularSoundbite: { type: Type.STRING },
-            psychologicalProjection: {
-              type: Type.OBJECT,
-              properties: {
-                buyerFear: { type: Type.STRING },
-                buyerIncentive: { type: Type.STRING },
-                strategicLever: { type: Type.STRING }
-              },
-              required: ["buyerFear", "buyerIncentive", "strategicLever"]
-            },
-            citations: {
-              type: Type.ARRAY,
-              items: {
-                type: Type.OBJECT,
-                properties: {
-                  snippet: { type: Type.STRING },
-                  source: { type: Type.STRING }
-                },
-                required: ["snippet", "source"]
-              }
-            },
-            reasoningChain: {
-              type: Type.OBJECT,
-              properties: {
-                painPoint: { type: Type.STRING },
-                capability: { type: Type.STRING },
-                strategicValue: { type: Type.STRING }
-              },
-              required: ["painPoint", "capability", "strategicValue"]
-            }
+            detailedAnalysis: { type: Type.STRING, description: "Multi-paragraph explanation using ### for styles" },
+            useCase: { type: Type.STRING, description: "Comprehensive business use case scenario" },
+            personaAlignment: { type: Type.STRING, description: "In-depth psychological fit for the persona" },
+            conclusion: { type: Type.STRING, description: "Strong final strategic takeaway" },
+            articularSoundbite: { type: Type.STRING, description: "Powerful one-sentence executive summary" }
           },
-          required: ["answer", "briefExplanation", "articularSoundbite", "psychologicalProjection", "citations", "reasoningChain"]
+          required: ["detailedAnalysis", "useCase", "personaAlignment", "conclusion", "articularSoundbite"]
         }
       }
     });
     
-    return JSON.parse(response.text || "{}");
+    const text = response.text || "{}";
+    return JSON.parse(text);
   } catch (error: any) {
-    throw new Error("Cognitive search synthesis failed.");
+    console.error("Flash synthesis failed:", error);
+    throw new Error("Velocity inquiry failed.");
   }
 }
 
@@ -300,6 +273,9 @@ export async function analyzeSalesContext(filesContent: string, context: Meeting
         responseMimeType: "application/json",
         responseSchema,
         temperature: context.temperature,
+        topP: context.topP,
+        topK: context.topK,
+        seed: context.seed,
         thinkingConfig: { thinkingBudget: THINKING_LEVEL_MAP[context.thinkingLevel] }
       },
     });

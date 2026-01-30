@@ -86,7 +86,6 @@ export interface OpeningLine {
   citation: Citation;
 }
 
-// Added VideoStoryboard interface to support video generation concepts
 export interface VideoStoryboard {
   id: string;
   title: string;
@@ -146,4 +145,7 @@ export interface MeetingContext {
   baseSystemPrompt: string;
   thinkingLevel: ThinkingLevel;
   temperature: number;
+  topP?: number;
+  topK?: number;
+  seed?: number;
 }
