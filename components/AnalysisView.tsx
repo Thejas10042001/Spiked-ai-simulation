@@ -1,98 +1,141 @@
+
 import React, { useState, useRef, useMemo } from 'react';
-import { AnalysisResult, Citation, UploadedFile, BuyerSnapshot, ObjectionPair } from '../types';
+import { AnalysisResult, Citation, UploadedFile, BuyerSnapshot, MeetingContext, CompetitorInsight, MatrixItem } from '../types';
 import { ICONS } from '../constants';
 import { generatePitchAudio, decodeAudioData } from '../services/geminiService';
 
 interface AnalysisViewProps {
   result: AnalysisResult;
   files: UploadedFile[];
+  context: MeetingContext;
 }
 
-const getArchetype = (snapshot: BuyerSnapshot) => {
-  const risk = (snapshot.riskTolerance || "").toLowerCase();
-  const decision = (snapshot.decisionStyle || "").toLowerCase();
-  
-  if (risk.includes('high') || risk.includes('aggressive')) {
-    if (decision.includes('analytical')) return { title: "The Calculated Maverick", desc: "Aggressive goals backed by intense data scrutiny." };
-    return { title: "The Visionary Scaler", desc: "High-velocity decision maker focused on future-state transformation." };
-  }
-  if (decision.includes('analytical') || decision.includes('data')) {
-    return { title: "The Strategic Guardian", desc: "Deeply risk-averse, requires bulletproof ROI and documentation." };
-  }
-  return { title: "The Pragmatic Orchestrator", desc: "Balanced approach focused on operational stability and peer consensus." };
+const VOICES = [
+  { name: 'Kore', label: 'Pro Male' },
+  { name: 'Puck', label: 'High Energy' },
+  { name: 'Charon', label: 'Deep Authority' },
+  { name: 'Zephyr', label: 'Calm Strategist' },
+];
+
+const CognitiveRadarChart = ({ data, size = 320 }: { data: { label: string, value: number }[], size?: number }) => {
+  const center = size / 2;
+  const radius = size * 0.35;
+  const angleStep = (Math.PI * 2) / data.length;
+
+  const points = data.map((d, i) => {
+    const angle = i * angleStep - Math.PI / 2;
+    const r = (d.value / 100) * radius;
+    return {
+      x: center + r * Math.cos(angle),
+      y: center + r * Math.sin(angle),
+      labelX: center + (radius + 45) * Math.cos(angle),
+      labelY: center + (radius + 45) * Math.sin(angle),
+    };
+  });
+
+  const polygonPath = points.map(p => `${p.x},${p.y}`).join(' ');
+
+  return (
+    <div className="relative flex items-center justify-center p-8">
+      <svg width={size + 160} height={size + 100} className="overflow-visible drop-shadow-xl">
+        <defs>
+          <radialGradient id="radarGrad">
+            <stop offset="0%" stopColor="rgba(79, 70, 229, 0.4)" />
+            <stop offset="100%" stopColor="rgba(79, 70, 229, 0.05)" />
+          </radialGradient>
+        </defs>
+        {[0.2, 0.4, 0.6, 0.8, 1].map((r, idx) => (
+          <circle key={idx} cx={center} cy={center} r={radius * r} fill={idx === 4 ? "url(#radarGrad)" : "none"} stroke="rgba(79, 70, 229, 0.1)" strokeWidth="1" />
+        ))}
+        {data.map((_, i) => (
+          <line key={i} x1={center} y1={center} x2={center + radius * Math.cos(i * angleStep - Math.PI / 2)} y2={center + radius * Math.sin(i * angleStep - Math.PI / 2)} stroke="rgba(79, 70, 229, 0.15)" strokeWidth="1" />
+        ))}
+        <polygon points={polygonPath} fill="rgba(79, 70, 229, 0.3)" stroke="rgba(79, 70, 229, 0.8)" strokeWidth="3" />
+        {data.map((d, i) => (
+          <text key={i} x={points[i].labelX} y={points[i].labelY} textAnchor="middle" className="text-[9px] font-black uppercase fill-slate-500 tracking-widest">{d.label}</text>
+        ))}
+      </svg>
+    </div>
+  );
 };
 
-const parseIntensity = (str: string, highKeys: string[], lowKeys: string[]) => {
-  const s = (str || "").toLowerCase();
-  if (highKeys.some(k => s.includes(k))) return 85 + Math.random() * 10;
-  if (lowKeys.some(k => s.includes(k))) return 25 + Math.random() * 15;
-  return 55 + Math.random() * 10;
-};
+const CompetitorCard = ({ comp, name }: { comp: CompetitorInsight, name: string }) => (
+  <div className="p-8 rounded-[2.5rem] bg-slate-50 border border-slate-100 hover:bg-white hover:border-indigo-300 hover:shadow-2xl transition-all duration-500 group">
+    <div className="flex items-center justify-between mb-6">
+      <h4 className="text-xl font-black text-slate-900">{name}</h4>
+      <span className={`px-3 py-1 rounded-full text-[8px] font-black uppercase tracking-widest border ${comp.threatProfile === 'Direct' ? 'bg-rose-50 text-rose-600 border-rose-100' : 'bg-amber-50 text-amber-600 border-amber-100'}`}>
+        {comp.threatProfile} Threat
+      </span>
+    </div>
+    <p className="text-xs text-slate-500 font-medium mb-4 italic">“{comp.overview}”</p>
+    <div className="space-y-4">
+      <div>
+        <p className="text-[9px] font-black uppercase text-emerald-600 tracking-widest mb-1">Our Wedge</p>
+        <p className="text-sm font-bold text-slate-800">{comp.ourWedge}</p>
+      </div>
+      <div className="grid grid-cols-2 gap-4">
+        <div>
+          <p className="text-[8px] font-black uppercase text-indigo-400 mb-1">Strengths</p>
+          <ul className="text-[10px] text-slate-500 list-disc pl-3">
+            {comp.strengths.slice(0, 3).map((s, i) => <li key={i}>{s}</li>)}
+          </ul>
+        </div>
+        <div>
+          <p className="text-[8px] font-black uppercase text-rose-400 mb-1">Weaknesses</p>
+          <ul className="text-[10px] text-slate-500 list-disc pl-3">
+            {comp.weaknesses.slice(0, 3).map((w, i) => <li key={i}>{w}</li>)}
+          </ul>
+        </div>
+      </div>
+    </div>
+  </div>
+);
 
-export const AnalysisView: React.FC<AnalysisViewProps> = ({ result, files }) => {
+export const AnalysisView: React.FC<AnalysisViewProps> = ({ result, files, context }) => {
   const [highlightedSnippet, setHighlightedSnippet] = useState<string | null>(null);
-  const [expandedObjections, setExpandedObjections] = useState<Set<number>>(new Set([0]));
   const [playingAudioId, setPlayingAudioId] = useState<string | null>(null);
-  const [copiedId, setCopiedId] = useState<number | null>(null);
-  
+  const [selectedVoice, setSelectedVoice] = useState('Kore');
+  const [isGeneratingAudio, setIsGeneratingAudio] = useState(false);
+  const [isExporting, setIsExporting] = useState(false);
   const audioContextRef = useRef<AudioContext | null>(null);
   const audioSourceRef = useRef<AudioBufferSourceNode | null>(null);
 
-  const archetype = useMemo(() => getArchetype(result.snapshot), [result.snapshot]);
+  const radarData = useMemo(() => [
+    { label: "Risk Tolerance", value: result.snapshot.metrics.riskToleranceValue },
+    { label: "Strategic Focus", value: result.snapshot.metrics.strategicPriorityFocus },
+    { label: "Analytical Depth", value: result.snapshot.metrics.analyticalDepth },
+    { label: "Directness", value: result.snapshot.metrics.directness },
+    { label: "Innovation", value: result.snapshot.metrics.innovationAppetite },
+  ], [result.snapshot]);
 
-  const allCitations = useMemo(() => {
-    const list: (Citation & { label: string; id: string; type: string })[] = [];
-    const add = (c: Citation | undefined, label: string, id: string, type: string) => {
-      if (c && c.snippet) list.push({ ...c, label, id, type });
-    };
+  // Consolidate all evidence for the Evidence Index
+  const evidenceIndex = useMemo(() => {
+    const list: { source: string; snippet: string; category: string }[] = [];
+    
+    // Snapshot Citations
+    if (result.snapshot.roleCitation) list.push({ source: result.snapshot.roleCitation.sourceFile, snippet: result.snapshot.roleCitation.snippet, category: 'Persona' });
+    result.snapshot.priorities.forEach(p => list.push({ source: p.citation.sourceFile, snippet: p.citation.snippet, category: 'Priority' }));
+    
+    // Ground Matrix Citations
+    result.groundMatrix?.forEach(m => list.push({ source: m.evidence.sourceFile, snippet: m.evidence.snippet, category: 'Ground Fact' }));
+    
+    // Objection Handling Citations
+    result.objectionHandling.forEach(o => list.push({ source: o.citation.sourceFile, snippet: o.citation.snippet, category: 'Objection Defense' }));
+    
+    // Document Entities
+    result.documentInsights.entities.forEach(e => list.push({ source: e.citation.sourceFile, snippet: e.citation.snippet, category: 'Entity Discovery' }));
 
-    add(result.snapshot.roleCitation, "Role", "snapshot-role", "Trait");
-    add(result.snapshot.decisionStyleCitation, "Decision Style", "snapshot-decision", "Trait");
-    add(result.snapshot.riskToleranceCitation, "Risk Tolerance", "snapshot-risk", "Trait");
-    
-    (result.snapshot.priorities || []).forEach((p, i) => add(p.citation, `Priority: ${p.text}`, `priority-${i}`, "Strategic"));
-    (result.competitiveComparison || []).forEach((c, i) => add(c.citation, `Competitor: ${c.name}`, `competitor-${i}`, "Competitive"));
-    (result.objectionHandling || []).forEach((o, i) => add(o.citation, `Objection: ${o.objection}`, `objection-${i}`, "Tactical"));
-    
     return list;
   }, [result]);
 
-  const toggleObjection = (idx: number) => {
-    const next = new Set(expandedObjections);
-    if (next.has(idx)) {
-      next.delete(idx);
-    } else {
-      next.add(idx);
-    }
-    setExpandedObjections(next);
-  };
-
-  const copyToClipboard = (text: string, idx: number) => {
-    navigator.clipboard.writeText(text);
-    setCopiedId(idx);
-    setTimeout(() => setCopiedId(null), 2000);
-  };
-
-  const scrollToSource = (citation: Citation) => {
-    if (!citation?.snippet) return;
-    setHighlightedSnippet(citation.snippet);
-    const explorer = document.getElementById('grounding-explorer');
-    if (explorer) explorer.scrollIntoView({ behavior: 'smooth', block: 'start' });
-  };
-
-  const playSnippet = async (text: string, id: string) => {
-    if (playingAudioId === id) {
-      audioSourceRef.current?.stop();
-      setPlayingAudioId(null);
-      return;
-    }
+  const playAudioForText = async (text: string, id: string) => {
+    if (playingAudioId === id) { audioSourceRef.current?.stop(); setPlayingAudioId(null); return; }
+    setIsGeneratingAudio(true);
     setPlayingAudioId(id);
     try {
-      if (!audioContextRef.current) {
-        audioContextRef.current = new (window.AudioContext || (window as any).webkitAudioContext)({ sampleRate: 24000 });
-      }
-      const bytes = await generatePitchAudio(text, 'Kore');
-      if (!bytes) return;
+      if (!audioContextRef.current) audioContextRef.current = new (window.AudioContext || (window as any).webkitAudioContext)({ sampleRate: 24000 });
+      const bytes = await generatePitchAudio(text, selectedVoice);
+      if (!bytes) throw new Error();
       const buffer = await decodeAudioData(bytes, audioContextRef.current, 24000, 1);
       const source = audioContextRef.current.createBufferSource();
       source.buffer = buffer;
@@ -101,341 +144,250 @@ export const AnalysisView: React.FC<AnalysisViewProps> = ({ result, files }) => 
       audioSourceRef.current?.stop();
       audioSourceRef.current = source;
       source.start();
-    } catch (e) {
-      setPlayingAudioId(null);
-    }
+    } catch (e) { setPlayingAudioId(null); } finally { setIsGeneratingAudio(false); }
+  };
+
+  const generateReportPDF = async () => {
+    setIsExporting(true);
+    try {
+      const { jsPDF } = (window as any).jspdf;
+      const doc = new jsPDF();
+      let y = 20;
+      const margin = 20;
+      const pageWidth = doc.internal.pageSize.getWidth();
+
+      const addHeader = (text: string, color = [79, 70, 229]) => {
+        doc.setFont("helvetica", "bold");
+        doc.setFontSize(16);
+        doc.setTextColor(color[0], color[1], color[2]);
+        doc.text(text, margin, y);
+        y += 10;
+        doc.setDrawColor(color[0], color[1], color[2]);
+        doc.line(margin, y - 5, pageWidth - margin, y - 5);
+        y += 5;
+      };
+
+      const addBody = (text: string, size = 10) => {
+        doc.setFont("helvetica", "normal");
+        doc.setFontSize(size);
+        doc.setTextColor(60, 60, 60);
+        const split = doc.splitTextToSize(text, pageWidth - margin * 2);
+        doc.text(split, margin, y);
+        y += split.length * (size / 2) + 5;
+        if (y > 270) { doc.addPage(); y = 20; }
+      };
+
+      // Header
+      doc.setFillColor(79, 70, 229);
+      doc.rect(0, 0, pageWidth, 40, 'F');
+      doc.setFontSize(24);
+      doc.setTextColor(255);
+      doc.text("COGNITIVE SALES STRATEGY", margin, 25);
+      doc.setFontSize(10);
+      doc.text(`SYNTHESIZED FOR: ${context.clientCompany.toUpperCase()}`, margin, 35);
+      y = 55;
+
+      // Meeting Summary
+      addHeader("MEETING SUMMARY");
+      addBody(`Client: ${context.clientCompany} (${context.clientNames})`);
+      addBody(`Seller: ${context.sellerCompany} (${context.sellerNames})`);
+      addBody(`Focus: ${context.meetingFocus}`);
+      y += 10;
+
+      // Ground Matrix
+      addHeader("COGNITIVE GROUND MATRIX");
+      result.groundMatrix.forEach(m => {
+        doc.setFont("helvetica", "bold");
+        doc.text(`[${m.category}] ${m.observation}`, margin, y);
+        y += 5;
+        addBody(`Significance: ${m.significance}`, 9);
+      });
+
+      // Psychology Section
+      doc.addPage(); y = 20;
+      addHeader("BUYER PSYCHOLOGY & METRICS");
+      addBody(`Identity: ${result.snapshot.personaIdentity}`);
+      addBody(`Decision Logic: ${result.snapshot.decisionLogic}`);
+      y += 80; // Placeholder for chart
+
+      // Competitive Hub
+      addHeader("COMPETITIVE INTELLIGENCE HUB");
+      const addComp = (c: CompetitorInsight, name: string) => {
+        doc.setFont("helvetica", "bold");
+        doc.setFontSize(12);
+        doc.setTextColor(0);
+        doc.text(`${name} - ${c.threatProfile} Threat`, margin, y);
+        y += 6;
+        addBody(`Wedge: ${c.ourWedge}`);
+      };
+      addComp(result.competitiveHub.cognigy, "COGNIGY");
+      addComp(result.competitiveHub.amelia, "AMELIA");
+
+      // Evidence Index
+      doc.addPage(); y = 20;
+      addHeader("ANALYSIS EVIDENCE INDEX");
+      evidenceIndex.slice(0, 15).forEach(ev => {
+        doc.setFont("helvetica", "italic");
+        doc.setFontSize(8);
+        doc.text(`Source: ${ev.source} (${ev.category})`, margin, y);
+        y += 4;
+        addBody(`"${ev.snippet}"`, 7);
+      });
+
+      doc.save(`Strategy-${context.clientCompany}.pdf`);
+    } catch (e) { console.error(e); } finally { setIsExporting(false); }
   };
 
   return (
-    <div className="relative space-y-12 animate-in fade-in slide-in-from-bottom-4 duration-700 pb-20">
-      
-      {/* COGNITIVE PROFILE DASHBOARD */}
-      <section className="bg-white rounded-[4rem] p-12 shadow-2xl border border-slate-200 relative overflow-hidden">
-        <div className="absolute top-0 right-0 p-12 opacity-5"><ICONS.Brain className="w-48 h-48 text-indigo-900" /></div>
-        <div className="relative z-10 flex flex-col xl:flex-row gap-16 items-start">
-          <div className="w-full xl:w-[400px] space-y-10">
-            <div className="text-center">
-               <h2 className="text-4xl font-black text-slate-900 tracking-tight leading-none mb-4">{archetype.title}</h2>
-               <p className="text-slate-500 font-medium leading-relaxed max-w-sm mx-auto italic">“{archetype.desc}”</p>
-            </div>
-            <div className="bg-slate-900 rounded-[2.5rem] p-8 shadow-2xl space-y-6">
-               <IntensityBar label="Risk Tolerance" value={parseIntensity(result.snapshot.riskTolerance, ['high', 'aggressive'], ['low', 'averse'])} color="rose" />
-               <IntensityBar label="Analytical Depth" value={parseIntensity(result.snapshot.decisionStyle, ['analytical', 'data'], ['gut', 'fast'])} color="indigo" />
-            </div>
-          </div>
-          <div className="flex-1 space-y-12">
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-8">
-               {(result.snapshot.priorities || []).map((item, i) => (
-                 <div key={i} className="p-8 rounded-[2rem] bg-slate-50 border border-slate-100">
-                    <p className="text-[10px] font-black uppercase tracking-widest text-indigo-500 mb-2">Priority Pillar</p>
-                    <p className="text-lg font-black text-slate-800">{item.text}</p>
-                 </div>
-               ))}
-            </div>
-          </div>
-        </div>
-      </section>
+    <div className="space-y-12 pb-20">
+      <div className="flex justify-end">
+        <button onClick={generateReportPDF} disabled={isExporting} className="bg-indigo-600 text-white px-8 py-4 rounded-2xl font-black text-xs uppercase tracking-widest shadow-xl hover:bg-indigo-700">
+          {isExporting ? 'Generating Report...' : 'Download Strategy Report'}
+        </button>
+      </div>
 
-      {/* OBJECTION HANDLING BATTLE-DRILL (INTERACTIVE ACCORDION) */}
-      <section className="bg-white rounded-[3rem] p-10 shadow-2xl border border-slate-200">
-        <div className="flex items-center gap-4 mb-10">
-          <div className="p-4 bg-indigo-600 text-white rounded-2xl shadow-xl shadow-indigo-100">
-            <ICONS.Security />
-          </div>
-          <div>
-            <h2 className="text-2xl font-black text-slate-800 tracking-tight">Interactive Objection Battle-Drill</h2>
-            <p className="text-sm text-slate-500 font-medium">Click each anticipated barrier to reveal the strategic deconstruction and verbatim counters.</p>
-          </div>
-        </div>
-
-        <div className="space-y-4">
-          {(result.objectionHandling || []).map((obj, idx) => {
-            const isExpanded = expandedObjections.has(idx);
-            return (
-              <div 
-                key={idx} 
-                className={`rounded-[2.5rem] border transition-all duration-500 overflow-hidden ${isExpanded ? 'bg-slate-50 border-indigo-200 shadow-xl' : 'bg-white border-slate-100 hover:border-slate-300 shadow-sm'}`}
-              >
-                {/* Accordion Header */}
-                <button 
-                  onClick={() => toggleObjection(idx)}
-                  className="w-full text-left px-10 py-8 flex items-center justify-between group focus:outline-none"
-                >
-                  <div className="flex items-center gap-6 flex-1">
-                    <div className={`w-10 h-10 rounded-full flex items-center justify-center font-black text-sm transition-all ${isExpanded ? 'bg-indigo-600 text-white rotate-12 scale-110' : 'bg-slate-100 text-slate-400 group-hover:bg-slate-200'}`}>
-                      {idx + 1}
-                    </div>
-                    <span className={`text-xl font-black tracking-tight transition-colors ${isExpanded ? 'text-indigo-600' : 'text-slate-800'}`}>
-                      {obj.objection}
-                    </span>
-                  </div>
-                  <div className={`transition-transform duration-500 ${isExpanded ? 'rotate-180' : ''}`}>
-                    <svg xmlns="http://www.w3.org/2000/svg" className={`w-6 h-6 ${isExpanded ? 'text-indigo-600' : 'text-slate-300'}`} fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={3} d="M19 9l-7 7-7-7" />
-                    </svg>
-                  </div>
-                </button>
-
-                {/* Accordion Content */}
-                {isExpanded && (
-                  <div className="px-10 pb-10 pt-2 animate-in slide-in-from-top-4 duration-500">
-                    <div className="grid grid-cols-1 lg:grid-cols-2 gap-10">
-                      
-                      {/* Strategic Logic Column */}
-                      <div className="space-y-8">
-                        <div className="group/item">
-                          <h4 className="text-[10px] font-black uppercase tracking-[0.3em] text-rose-500 mb-3 flex items-center gap-2">
-                            <ICONS.Brain className="w-4 h-4" /> Cognitive Decoding: The "Real" Meaning
-                          </h4>
-                          <div className="relative">
-                            <div className="absolute -left-4 top-0 bottom-0 w-1 bg-rose-200 rounded-full group-hover/item:bg-rose-400 transition-colors"></div>
-                            <p className="text-lg text-slate-700 font-black italic leading-relaxed pl-6">
-                              “{obj.realMeaning}”
-                            </p>
-                          </div>
-                          <p className="text-[10px] text-slate-400 font-bold mt-2 pl-6 uppercase tracking-widest italic opacity-60">Psychological Inferred Subtext</p>
-                        </div>
-
-                        <div className="group/item">
-                          <h4 className="text-[10px] font-black uppercase tracking-[0.3em] text-indigo-500 mb-3 flex items-center gap-2">
-                            <ICONS.Trophy className="w-4 h-4" /> Response Strategy & Logic Path
-                          </h4>
-                          <div className="relative">
-                            <div className="absolute -left-4 top-0 bottom-0 w-1 bg-indigo-200 rounded-full group-hover/item:bg-indigo-400 transition-colors"></div>
-                            <p className="text-sm text-slate-600 leading-relaxed font-semibold pl-6">
-                              {obj.strategy}
-                            </p>
-                          </div>
-                        </div>
-
-                        <div className="pt-2 flex items-center gap-4">
-                          <button 
-                            onClick={() => scrollToSource(obj.citation)}
-                            className="inline-flex items-center gap-2 px-5 py-2.5 rounded-full text-[9px] font-black uppercase tracking-widest bg-white border border-slate-200 text-slate-400 hover:text-indigo-600 hover:border-indigo-200 hover:bg-indigo-50 transition-all shadow-sm"
-                          >
-                            <ICONS.Shield className="w-3.5 h-3.5" /> Source Document Evidence
-                          </button>
-                        </div>
-                      </div>
-
-                      {/* Articular Pitch Column */}
-                      <div className="relative">
-                        <div className="bg-slate-900 rounded-[2.5rem] p-10 shadow-2xl relative overflow-hidden h-full flex flex-col justify-between border border-slate-800">
-                          <div className="absolute -top-4 -right-4 p-12 opacity-5"><ICONS.Speaker className="w-40 h-40 text-white" /></div>
-                          <div className="relative z-10 space-y-5">
-                            <div className="flex items-center gap-3">
-                              <div className="w-1.5 h-6 bg-indigo-500 rounded-full"></div>
-                              <h4 className="text-[9px] font-black uppercase tracking-[0.4em] text-indigo-400">Verbatim Sales Script</h4>
-                            </div>
-                            <p className="text-2xl font-black italic leading-tight text-white tracking-tight">
-                              “{obj.exactWording}”
-                            </p>
-                            <div className="flex items-center gap-2">
-                              <span className="text-[10px] font-bold text-slate-500 uppercase tracking-widest">Target Tone:</span>
-                              <span className="text-[10px] font-black text-indigo-400 uppercase tracking-widest">{result.snapshot.tone}</span>
-                            </div>
-                          </div>
-                          
-                          <div className="relative z-10 pt-10 flex flex-col sm:flex-row items-center gap-4">
-                            <button 
-                              onClick={() => playSnippet(obj.exactWording, `obj-audio-${idx}`)}
-                              className={`w-full sm:flex-1 flex items-center justify-center gap-3 py-4 rounded-2xl font-black text-[11px] uppercase tracking-widest transition-all shadow-lg active:scale-95 ${playingAudioId === `obj-audio-${idx}` ? 'bg-rose-600 text-white' : 'bg-white text-slate-900 hover:bg-indigo-50'}`}
-                            >
-                              {playingAudioId === `obj-audio-${idx}` ? (
-                                <><div className="w-2 h-2 bg-white rounded-full animate-ping"></div> Stop Playback</>
-                              ) : (
-                                <><ICONS.Play className="w-4 h-4" /> AI Audio Pitch</>
-                              )}
-                            </button>
-                            <button 
-                              onClick={() => copyToClipboard(obj.exactWording, idx)}
-                              className={`w-full sm:w-auto px-8 py-4 rounded-2xl font-black text-[11px] uppercase tracking-widest transition-all border active:scale-95 ${copiedId === idx ? 'bg-emerald-500 border-emerald-500 text-white' : 'bg-slate-800 border-slate-700 text-slate-400 hover:text-white hover:border-slate-500'}`}
-                            >
-                              {copiedId === idx ? 'Copied' : 'Copy Text'}
-                            </button>
-                          </div>
-                        </div>
-                      </div>
-
-                    </div>
-                  </div>
-                )}
-              </div>
-            );
-          })}
-        </div>
-      </section>
-
-      {/* COMPETITIVE COMPARISON SECTION */}
-      {result.competitiveComparison && result.competitiveComparison.length > 0 && (
-        <section className="bg-white rounded-[3rem] p-10 shadow-2xl border border-slate-200">
-          <div className="flex items-center gap-4 mb-10">
-             <div className="p-4 bg-rose-600 text-white rounded-2xl shadow-xl shadow-rose-100">
-                <ICONS.Search />
-             </div>
-             <div>
-               <h2 className="text-2xl font-black text-slate-800 tracking-tight">Competitive Intelligence Hub</h2>
-               <p className="text-sm text-slate-500 font-medium">Deep-dive into inferred and explicit competitive dynamics.</p>
-             </div>
-          </div>
-
-          <div className="space-y-12">
-            {result.competitiveComparison.map((comp, idx) => {
-              const isGrounded = highlightedSnippet === comp.citation?.snippet;
-              return (
-                <div 
-                  key={idx} 
-                  id={`competitor-${idx}`}
-                  className={`p-10 rounded-[3rem] border transition-all duration-500 ${isGrounded ? 'bg-rose-50 border-rose-400 ring-8 ring-rose-50' : 'bg-slate-50 border-slate-100'}`}
-                >
-                  <div className="flex flex-col md:flex-row justify-between items-start md:items-center gap-6 mb-8 border-b border-slate-200/60 pb-8">
-                    <div>
-                      <h3 className="text-3xl font-black text-slate-900 tracking-tight uppercase">{comp.name}</h3>
-                      <p className="text-rose-600 text-[10px] font-black uppercase tracking-[0.3em] mt-1 italic">*Direct/Indirect Threat Profile*</p>
-                    </div>
-                  </div>
-
-                  <div className="space-y-8">
-                    <div>
-                      <h4 className="text-xs font-black uppercase tracking-widest text-slate-400 mb-3">**Competitor Overview**</h4>
-                      <p className="text-lg text-slate-700 leading-relaxed font-medium italic">
-                        "{comp.overview}"
+      {/* Ground Matrix Hero Section */}
+      <section className="bg-white rounded-[4rem] p-12 shadow-2xl border border-slate-200 overflow-hidden relative">
+        <div className="absolute top-0 right-0 p-12 opacity-5"><ICONS.Shield className="w-64 h-64 text-indigo-900" /></div>
+        <div className="relative z-10">
+          <h3 className="text-[10px] font-black uppercase tracking-[0.4em] text-indigo-500 mb-2">Source Grounding</h3>
+          <h2 className="text-4xl font-black text-slate-900 mb-10">Cognitive Ground Matrix</h2>
+          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-5 gap-6">
+            {result.groundMatrix.map((item, idx) => (
+              <div key={idx} className="bg-slate-50 border border-slate-100 p-8 rounded-[2.5rem] flex flex-col hover:bg-white hover:border-indigo-300 hover:shadow-xl transition-all group">
+                <span className="text-[8px] font-black uppercase tracking-widest text-indigo-500 mb-3 px-2 py-1 bg-white border border-indigo-50 rounded-full inline-block w-fit">
+                  {item.category}
+                </span>
+                <p className="text-md font-bold text-slate-900 mb-4 leading-tight group-hover:text-indigo-600 transition-colors">
+                  {item.observation}
+                </p>
+                <div className="mt-auto space-y-3">
+                   <p className="text-[10px] text-slate-500 font-medium italic leading-relaxed">
+                     “{item.significance}”
+                   </p>
+                   <div className="pt-4 border-t border-slate-200">
+                      <p className="text-[7px] font-black uppercase text-slate-400 tracking-widest mb-1 flex items-center gap-1">
+                        <ICONS.Document className="w-2 h-2" /> Evidence Source
                       </p>
-                    </div>
+                      <p className="text-[8px] font-bold text-slate-600 truncate">{item.evidence.sourceFile}</p>
+                   </div>
+                </div>
+              </div>
+            ))}
+          </div>
+        </div>
+      </section>
 
-                    <div className="grid grid-cols-1 md:grid-cols-2 gap-10">
-                      <div className="space-y-4">
-                        <h4 className="text-[11px] font-black uppercase tracking-widest text-emerald-600 flex items-center gap-2">
-                           <ICONS.Growth /> **Potential Strengths**
-                        </h4>
-                        <ul className="space-y-3">
-                          {comp.strengths.map((s, i) => (
-                            <li key={i} className="flex gap-3 text-sm text-slate-600 leading-relaxed italic">
-                              <span className="text-emerald-500 shrink-0">●</span>
-                              <span>{s}</span>
-                            </li>
-                          ))}
-                        </ul>
-                      </div>
-                      <div className="space-y-4">
-                        <h4 className="text-[11px] font-black uppercase tracking-widest text-rose-600 flex items-center gap-2">
-                           <ICONS.Security /> **Potential Weaknesses**
-                        </h4>
-                        <ul className="space-y-3">
-                          {comp.weaknesses.map((w, i) => (
-                            <li key={i} className="flex gap-3 text-sm text-slate-600 leading-relaxed italic">
-                              <span className="text-rose-500 shrink-0">●</span>
-                              <span>{w}</span>
-                            </li>
-                          ))}
-                        </ul>
-                      </div>
-                    </div>
-
-                    <div className="bg-indigo-900 text-white rounded-[2.5rem] p-10 shadow-2xl relative overflow-hidden group">
-                      <div className="absolute top-0 right-0 p-12 opacity-10 group-hover:rotate-12 transition-transform"><ICONS.Trophy className="w-32 h-32" /></div>
-                      <div className="relative z-10 space-y-4">
-                        <div className="flex items-center gap-3">
-                           <div className="w-1.5 h-6 bg-indigo-500 rounded-full"></div>
-                           <h4 className="text-[10px] font-black uppercase tracking-[0.4em] text-indigo-300">**Strategic Articulation: Our Wedge**</h4>
-                        </div>
-                        <p className="text-2xl font-black italic leading-tight text-white tracking-tight">
-                          “{comp.ourWedge}”
-                        </p>
-                      </div>
-                    </div>
+      {/* Psychology Matrix */}
+      <section className="bg-white rounded-[4rem] p-12 shadow-2xl border border-slate-200">
+        <div className="flex flex-col lg:flex-row gap-16 items-center">
+          <div className="w-full lg:w-1/2">
+            <h3 className="text-[10px] font-black uppercase tracking-[0.4em] text-indigo-500 mb-2">Neural Matrix</h3>
+            <h2 className="text-4xl font-black text-slate-900 mb-6">Buyer Psychology Identity</h2>
+            <div className="space-y-6 text-slate-600 italic border-l-4 border-indigo-100 pl-6">
+              <p><strong>Persona:</strong> {result.snapshot.personaIdentity}</p>
+              <p><strong>Logic:</strong> {result.snapshot.decisionLogic}</p>
+            </div>
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-8 mt-10">
+              {radarData.map((d, i) => (
+                <div key={i} className="space-y-2">
+                  <div className="flex justify-between text-[9px] font-black uppercase text-slate-400">
+                    <span>{d.label}</span>
+                    <span>{d.value}%</span>
+                  </div>
+                  <div className="h-1.5 w-full bg-slate-100 rounded-full overflow-hidden">
+                    <div className="h-full bg-indigo-500 rounded-full" style={{ width: `${d.value}%` }}></div>
                   </div>
                 </div>
-              );
-            })}
+              ))}
+            </div>
           </div>
-        </section>
-      )}
-
-      {/* DOCUMENT SUMMARIES */}
-      <section className="bg-white rounded-[3rem] p-10 shadow-2xl border border-slate-200">
-         <div className="flex items-center gap-3 mb-8">
-            <div className="p-3 bg-indigo-600 text-white rounded-2xl"><ICONS.Document /></div>
-            <h2 className="text-2xl font-bold text-slate-800 tracking-tight">Document Material Synthesis</h2>
-          </div>
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-            {(result.documentInsights.summaries || []).map((summary, idx) => (
-              <div key={idx} className="p-8 bg-slate-50 border border-slate-100 rounded-[2.5rem] space-y-4">
-                <h4 className="text-[11px] font-black uppercase text-indigo-500 tracking-[0.2em]">{summary.fileName}</h4>
-                <p className="text-sm font-bold text-slate-900 border-l-2 border-indigo-200 pl-4 italic">“{summary.strategicImpact}”</p>
-                <p className="text-xs text-slate-500 leading-relaxed">{summary.summary}</p>
-              </div>
-            ))}
-          </div>
-      </section>
-
-      {/* GROUNDING EXPLORER */}
-      <section id="grounding-explorer" className="bg-white rounded-[3rem] p-10 shadow-2xl border border-slate-200 overflow-hidden">
-        <div className="flex items-center gap-3 mb-8">
-          <div className="p-3 bg-indigo-600 text-white rounded-2xl"><ICONS.Shield /></div>
-          <h2 className="text-2xl font-bold text-slate-800 tracking-tight">Cognitive Evidence Matrix</h2>
-        </div>
-        <div className="grid grid-cols-1 lg:grid-cols-4 gap-8">
-          <div className="lg:col-span-1 space-y-2 max-h-[500px] overflow-y-auto pr-2 custom-scrollbar">
-            {allCitations.map((cit, idx) => (
-              <button key={idx} onClick={() => scrollToSource(cit)} className={`w-full text-left p-3 rounded-xl border transition-all ${highlightedSnippet === cit.snippet ? 'bg-indigo-600 border-indigo-600 text-white' : 'border-slate-100 bg-slate-50'}`}>
-                <p className="text-[8px] font-bold uppercase truncate opacity-60">{cit.sourceFile}</p>
-                <p className="text-xs font-semibold line-clamp-2">"{cit.label}"</p>
-              </button>
-            ))}
-          </div>
-          <div className="lg:col-span-3 bg-white rounded-3xl border border-slate-200 h-[600px] overflow-y-auto p-8 font-serif leading-relaxed text-sm whitespace-pre-wrap">
-            {files.map((file, i) => (
-              <div key={i} className="mb-12">
-                <h5 className="text-[10px] font-black text-indigo-400 uppercase tracking-widest mb-4 sticky top-0 bg-white py-2">{file.name}</h5>
-                <DocumentHighlighter text={file.content} citations={allCitations.filter(c => c.sourceFile === file.name)} highlightedSnippet={highlightedSnippet} />
-              </div>
-            ))}
+          <div className="w-full lg:w-1/2 flex justify-center">
+            <CognitiveRadarChart data={radarData} />
           </div>
         </div>
       </section>
 
-      <style>{`
-        .custom-scrollbar::-webkit-scrollbar { width: 4px; }
-        .custom-scrollbar::-webkit-scrollbar-thumb { background: #cbd5e1; border-radius: 10px; }
-        .grounding-active { background-color: #fbbf24 !important; color: #78350f !important; font-weight: 800; transform: scale(1.05); }
-      `}</style>
+      {/* Competitive Hub */}
+      <section className="bg-white rounded-[4rem] p-12 shadow-2xl border border-slate-200">
+        <div className="flex items-center gap-4 mb-10">
+          <div className="p-4 bg-rose-600 text-white rounded-2xl"><ICONS.Trophy /></div>
+          <div>
+            <h2 className="text-3xl font-black text-slate-900">Competitive Intelligence Hub</h2>
+            <p className="text-sm text-slate-500">Deep-dive into inferred and explicit dynamics.</p>
+          </div>
+        </div>
+        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-8">
+          <CompetitorCard comp={result.competitiveHub.cognigy} name="Cognigy" />
+          <CompetitorCard comp={result.competitiveHub.amelia} name="Amelia" />
+          {result.competitiveHub.others.map((c, i) => <CompetitorCard key={i} comp={c} name={c.name} />)}
+        </div>
+      </section>
+
+      {/* Battle Drills */}
+      <section className="bg-white rounded-[4rem] p-12 shadow-2xl border border-slate-200">
+        <h2 className="text-3xl font-black text-slate-900 mb-10">Objection Defense Drills</h2>
+        <div className="space-y-6">
+          {result.objectionHandling.map((o, i) => (
+            <div key={i} className="p-8 rounded-3xl bg-slate-50 border border-slate-100 flex flex-col md:flex-row gap-8 items-center">
+              <div className="flex-1">
+                <p className="text-[10px] font-black uppercase text-rose-500 mb-1">Objection</p>
+                <p className="text-xl font-black text-slate-900 mb-4">{o.objection}</p>
+                <p className="text-sm text-slate-500 font-medium italic">“{o.realMeaning}”</p>
+              </div>
+              <div className="flex-1 bg-white p-6 rounded-2xl shadow-sm border border-indigo-50">
+                <p className="text-[10px] font-black uppercase text-indigo-500 mb-1">Defense Script</p>
+                <p className="text-md font-bold text-slate-800 leading-tight">“{o.exactWording}”</p>
+                <button onClick={() => playAudioForText(o.exactWording, `obj-${i}`)} className="mt-4 flex items-center gap-2 text-[9px] font-black uppercase text-indigo-600 hover:text-indigo-800">
+                  <ICONS.Speaker className="w-4 h-4" /> Synthesize Audio
+                </button>
+              </div>
+            </div>
+          ))}
+        </div>
+      </section>
+
+      {/* Evidence Index Table */}
+      <section className="bg-slate-900 rounded-[4rem] p-12 text-white shadow-2xl relative overflow-hidden">
+        <div className="absolute top-0 right-0 p-16 opacity-5"><ICONS.Document className="w-96 h-96" /></div>
+        <div className="relative z-10">
+          <div className="flex items-center justify-between mb-12">
+            <div>
+              <h3 className="text-[11px] font-black uppercase tracking-[0.4em] text-indigo-400 mb-2">Master Traceability Index</h3>
+              <h2 className="text-3xl font-black">Analysis Evidence Index</h2>
+            </div>
+            <div className="flex items-center gap-2 px-6 py-3 bg-white/10 rounded-2xl border border-white/10">
+               <span className="text-indigo-300 font-black text-xl">{evidenceIndex.length}</span>
+               <span className="text-[9px] font-black uppercase tracking-widest opacity-60">Verified Document Links</span>
+            </div>
+          </div>
+
+          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-8">
+            {evidenceIndex.map((ev, i) => (
+              <div key={i} className="group bg-white/5 border border-white/10 p-8 rounded-[2.5rem] hover:bg-white/10 hover:border-indigo-500/50 transition-all">
+                <div className="flex items-center justify-between mb-4">
+                  <span className="text-[7px] font-black uppercase tracking-widest px-2 py-1 bg-indigo-500/20 text-indigo-300 rounded-full border border-indigo-500/30">
+                    {ev.category}
+                  </span>
+                  <ICONS.Shield className="w-3 h-3 text-indigo-400 opacity-50" />
+                </div>
+                <p className="text-[11px] font-serif italic text-white/80 leading-relaxed mb-6 group-hover:text-white transition-colors">
+                  “{ev.snippet.length > 150 ? ev.snippet.substring(0, 150) + '...' : ev.snippet}”
+                </p>
+                <div className="pt-4 border-t border-white/5 flex items-center gap-3">
+                   <div className="w-6 h-6 rounded-lg bg-indigo-600/30 flex items-center justify-center text-indigo-400">
+                     <ICONS.Document className="w-3 h-3" />
+                   </div>
+                   <div className="overflow-hidden">
+                      <p className="text-[8px] font-black text-white/40 uppercase tracking-widest mb-0.5">Found In</p>
+                      <p className="text-[9px] font-bold text-white/60 truncate">{ev.source}</p>
+                   </div>
+                </div>
+              </div>
+            ))}
+          </div>
+        </div>
+      </section>
     </div>
   );
-};
-
-const IntensityBar = ({ label, value, color }: { label: string, value: number, color: string }) => (
-  <div className="space-y-1.5">
-    <div className="flex justify-between items-end">
-      <span className="text-[9px] font-black uppercase tracking-widest text-slate-400">{label}</span>
-      <span className={`text-[10px] font-black text-${color}-400`}>{Math.round(value)}%</span>
-    </div>
-    <div className="h-1.5 w-full bg-white/5 rounded-full overflow-hidden border border-white/10">
-      <div className={`h-full rounded-full bg-${color}-500 transition-all duration-1000 ease-out`} style={{ width: `${value}%` }}></div>
-    </div>
-  </div>
-);
-
-const DocumentHighlighter = ({ text, citations, highlightedSnippet }: { 
-  text: string; 
-  citations: (Citation & { id: string })[]; 
-  highlightedSnippet: string | null;
-}) => {
-  if (!citations || !citations.length) return <>{text}</>;
-  let parts: React.ReactNode[] = [text];
-  citations.forEach((cit) => {
-    if (!cit.snippet) return;
-    const newParts: React.ReactNode[] = [];
-    parts.forEach((part) => {
-      if (typeof part !== 'string') { newParts.push(part); return; }
-      const index = part.indexOf(cit.snippet);
-      if (index === -1) { newParts.push(part); } else {
-        newParts.push(part.slice(0, index));
-        newParts.push(<mark key={cit.id} className={`cursor-pointer transition-all ${highlightedSnippet === cit.snippet ? 'grounding-active' : 'bg-indigo-50 text-indigo-700'}`}>{cit.snippet}</mark>);
-        newParts.push(part.slice(index + cit.snippet.length));
-      }
-    });
-    parts = newParts;
-  });
-  return <>{parts}</>;
 };

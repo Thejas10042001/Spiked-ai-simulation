@@ -37,6 +37,7 @@ export interface DocumentSummary {
 export interface CompetitorInsight {
   name: string;
   overview: string;
+  threatProfile: 'Direct' | 'Indirect' | 'Niche';
   strengths: string[];
   weaknesses: string[];
   ourWedge: string;
@@ -46,16 +47,24 @@ export interface CompetitorInsight {
 export interface BuyerSnapshot {
   role: string;
   roleCitation: Citation;
-  roleConfidence: number; // 0 to 1
+  roleConfidence: number;
   priorities: PriorityItem[];
   likelyObjections: ObjectionItem[];
   decisionStyle: string;
   decisionStyleCitation: Citation;
-  decisionStyleConfidence: number; // 0 to 1
   riskTolerance: string;
   riskToleranceCitation: Citation;
-  riskToleranceConfidence: number; // 0 to 1
   tone: string;
+  // New Psychological Metrics (0-100)
+  metrics: {
+    riskToleranceValue: number;
+    strategicPriorityFocus: number;
+    analyticalDepth: number;
+    directness: number;
+    innovationAppetite: number;
+  };
+  personaIdentity: string;
+  decisionLogic: string;
 }
 
 export interface QuestionPair {
@@ -86,12 +95,11 @@ export interface OpeningLine {
   citation: Citation;
 }
 
-export interface VideoStoryboard {
-  id: string;
-  title: string;
-  description: string;
-  angle: string;
-  veoPrompt: string;
+export interface MatrixItem {
+  category: string;
+  observation: string;
+  significance: string;
+  evidence: Citation;
 }
 
 export interface AnalysisResult {
@@ -100,8 +108,14 @@ export interface AnalysisResult {
     entities: DocumentEntity[];
     structure: DocumentStructure;
     summaries: DocumentSummary[];
+    materialSynthesis: string;
   };
-  competitiveComparison: CompetitorInsight[];
+  groundMatrix: MatrixItem[];
+  competitiveHub: {
+    cognigy: CompetitorInsight;
+    amelia: CompetitorInsight;
+    others: CompetitorInsight[];
+  };
   openingLines: OpeningLine[];
   predictedQuestions: QuestionPair[];
   strategicQuestionsToAsk: StrategicQuestion[];
@@ -116,6 +130,12 @@ export interface AnalysisResult {
     dos: string[];
     donts: string[];
     finalAdvice: string;
+  };
+  // Special Sections for PDF Report
+  reportSections: {
+    introBackground: string;
+    technicalDiscussion: string;
+    productIntegration: string;
   };
 }
 
@@ -145,7 +165,4 @@ export interface MeetingContext {
   baseSystemPrompt: string;
   thinkingLevel: ThinkingLevel;
   temperature: number;
-  topP?: number;
-  topK?: number;
-  seed?: number;
 }

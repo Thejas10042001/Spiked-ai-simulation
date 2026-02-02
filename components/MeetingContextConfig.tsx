@@ -1,4 +1,3 @@
-
 import React, { useState, useEffect, useRef } from 'react';
 import { MeetingContext, CustomerPersonaType, ThinkingLevel } from '../types';
 import { ICONS } from '../constants';
@@ -9,10 +8,10 @@ interface MeetingContextConfigProps {
 }
 
 const PERSONAS: { type: CustomerPersonaType; label: string; desc: string; icon: React.ReactNode }[] = [
-  { type: 'Balanced', label: 'Balanced', desc: 'Versatile profile for general business users in B2B settings', icon: <ICONS.Document className="w-8 h-8" /> },
-  { type: 'Technical', label: 'Technical', desc: 'Deep technical, jargon-friendly (CTO, VP Engineering, Tech Lead)', icon: <ICONS.Brain className="w-8 h-8" /> },
-  { type: 'Financial', label: 'Financial', desc: 'ROI-driven, cost-benefit analysis (CFO, Financial Controller)', icon: <ICONS.ROI className="w-8 h-8" /> },
-  { type: 'Business Executives', label: 'Executives', desc: 'Strategic impact, operational clarity (CEO, Founder, MD)', icon: <ICONS.Trophy className="w-8 h-8" /> },
+  { type: 'Balanced', label: 'Balanced', desc: 'Versatile profile for general business users in B2B settings', icon: <ICONS.Document /> },
+  { type: 'Technical', label: 'Technical', desc: 'Deep technical, jargon-friendly (CTO, VP Engineering, Tech Lead)', icon: <ICONS.Brain /> },
+  { type: 'Financial', label: 'Financial', desc: 'ROI-driven, cost-benefit analysis (CFO, Financial Controller)', icon: <ICONS.ROI /> },
+  { type: 'Business Executives', label: 'Executives', desc: 'Strategic impact, operational clarity (CEO, Founder, MD)', icon: <ICONS.Trophy /> },
 ];
 
 const ANSWER_STYLES = [
@@ -22,7 +21,6 @@ const ANSWER_STYLES = [
   "Concise Answer", 
   "In-Depth Response", 
   "Answer in Points", 
-  "Use Analogy", 
   "Define Technical Terms", 
   "Sales Points", 
   "Key Statistics", 
@@ -30,14 +28,28 @@ const ANSWER_STYLES = [
   "Competitive Comparison", 
   "Anticipated Customer Questions", 
   "Information Gap", 
-  "Pricing Overview"
+  "Pricing Overview",
+  "ROI Forecast",
+  "SWOT Analysis",
+  "Strategic Roadmap",
+  "Risk Assessment",
+  "Implementation Timeline",
+  "Technical Deep-Dive",
+  "Value Proposition",
+  "Financial Justification",
+  "Stakeholder Alignment",
+  "Competitive Wedge",
+  "Success Story Summary",
+  "Psychological Projection",
+  "Buying Fear Mitigation",
+  "Security & Compliance",
+  "Decision Matrix"
 ];
 
 export const MeetingContextConfig: React.FC<MeetingContextConfigProps> = ({ context, onContextChange }) => {
   const [keywordInput, setKeywordInput] = useState("");
   const [localPrompt, setLocalPrompt] = useState(context.baseSystemPrompt);
   const [isSaved, setIsSaved] = useState(false);
-  const [showAdvanced, setShowAdvanced] = useState(false);
   const isCustomizedRef = useRef(false);
 
   useEffect(() => {
@@ -164,10 +176,10 @@ export const MeetingContextConfig: React.FC<MeetingContextConfigProps> = ({ cont
             <button
               key={p.type}
               onClick={() => handleChange('persona', p.type)}
-              className={`p-8 rounded-[2.5rem] border-2 text-left transition-all relative overflow-hidden group flex flex-col items-center text-center ${context.persona === p.type ? 'bg-indigo-600 border-indigo-600 shadow-2xl scale-[1.02]' : 'bg-white border-slate-100 hover:border-indigo-300 shadow-sm'}`}
+              className={`p-8 rounded-[2.5rem] border-2 text-left transition-all relative overflow-hidden group ${context.persona === p.type ? 'bg-indigo-600 border-indigo-600 shadow-2xl scale-[1.02]' : 'bg-white border-slate-100 hover:border-indigo-300 shadow-sm'}`}
             >
-              <div className={`p-6 rounded-3xl mb-6 inline-block transition-transform duration-500 group-hover:scale-110 ${context.persona === p.type ? 'bg-white/20 text-white' : 'bg-indigo-50 text-indigo-500'}`}>{p.icon}</div>
-              <p className={`font-black text-lg uppercase tracking-widest mb-3 ${context.persona === p.type ? 'text-white' : 'text-slate-800'}`}>{p.label}</p>
+              <div className={`p-4 rounded-2xl mb-6 inline-block ${context.persona === p.type ? 'bg-white/20 text-white' : 'bg-indigo-50 text-indigo-500'}`}>{p.icon}</div>
+              <p className={`font-black text-base uppercase tracking-widest mb-3 ${context.persona === p.type ? 'text-white' : 'text-slate-800'}`}>{p.label}</p>
               <p className={`text-[11px] leading-relaxed font-medium ${context.persona === p.type ? 'text-indigo-100' : 'text-slate-500'}`}>{p.desc}</p>
               {context.persona === p.type && (
                 <div className="absolute top-6 right-6 text-white animate-bounce"><ICONS.Trophy /></div>
@@ -182,81 +194,16 @@ export const MeetingContextConfig: React.FC<MeetingContextConfigProps> = ({ cont
         <h3 className="text-xl font-bold text-slate-800 flex items-center gap-2">
           <ICONS.Sparkles /> Desired Strategic Response Styles
         </h3>
-        <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-4">
+        <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-5 gap-4">
           {ANSWER_STYLES.map(style => (
             <button
               key={style}
               onClick={() => toggleStyle(style)}
-              className={`px-6 py-4 rounded-[1.25rem] text-[10px] font-black uppercase tracking-widest border transition-all ${context.answerStyles.includes(style) ? 'bg-indigo-600 text-white border-indigo-600 shadow-lg' : 'bg-white text-slate-500 border-slate-100 hover:border-indigo-200 shadow-sm'}`}
+              className={`px-4 py-4 rounded-[1.25rem] text-[9px] font-black uppercase tracking-widest border transition-all leading-tight text-center ${context.answerStyles.includes(style) ? 'bg-indigo-600 text-white border-indigo-600 shadow-lg' : 'bg-white text-slate-500 border-slate-100 hover:border-indigo-200 shadow-sm'}`}
             >
               {style}
             </button>
           ))}
-        </div>
-      </div>
-
-      {/* Neural Core System Prompt with Advanced Tuning */}
-      <div className="bg-slate-900 rounded-[3rem] p-12 shadow-2xl relative overflow-hidden group">
-        <div className="absolute top-0 right-0 p-10 opacity-10 group-hover:opacity-30 transition-opacity">
-          <ICONS.Brain className="text-indigo-400 w-24 h-24" />
-        </div>
-        <div className="relative z-10 space-y-8">
-          <div className="flex items-center justify-between flex-wrap gap-4">
-            <div className="flex items-center gap-4">
-              <div className="w-1.5 h-6 bg-indigo-500 rounded-full"></div>
-              <h3 className="text-indigo-400 text-[11px] font-black uppercase tracking-[0.4em]">Neural Core Tuning</h3>
-            </div>
-            
-            <div className="flex items-center gap-4">
-              <button 
-                onClick={() => setShowAdvanced(!showAdvanced)}
-                className="flex items-center gap-2 px-4 py-2 rounded-xl text-[9px] font-black uppercase tracking-widest bg-slate-800 text-slate-400 hover:text-white transition-all"
-              >
-                <ICONS.Innovation className="w-4 h-4" /> {showAdvanced ? 'Simple Mode' : 'Advanced Sliders'}
-              </button>
-              <button 
-                onClick={savePrompt}
-                className={`flex items-center gap-2 px-6 py-2.5 rounded-xl text-[10px] font-black uppercase tracking-widest transition-all shadow-lg active:scale-95 ${isSaved ? 'bg-emerald-500 text-white' : 'bg-indigo-600 text-white hover:bg-indigo-700'}`}
-              >
-                {isSaved ? 'Prompt Retained' : 'Update & Save Prompt'}
-              </button>
-            </div>
-          </div>
-
-          {showAdvanced && (
-            <div className="grid grid-cols-1 md:grid-cols-3 gap-8 p-8 bg-slate-800/30 rounded-3xl border border-slate-700/50 animate-in fade-in slide-in-from-top-4">
-               <SliderInput label="Temperature" min={0} max={2} step={0.1} value={context.temperature} onChange={v => handleChange('temperature', v)} desc="Creativity factor (0 = Deterministic, 2 = Random)" />
-               <SliderInput label="Top-P" min={0} max={1} step={0.05} value={context.topP || 0.95} onChange={v => handleChange('topP', v)} desc="Nucleus sampling density" />
-               <SliderInput label="Top-K" min={1} max={100} step={1} value={context.topK || 40} onChange={v => handleChange('topK', v)} desc="Vocabulary diversity filter" />
-            </div>
-          )}
-
-          <div className="space-y-4">
-            <textarea
-              value={localPrompt}
-              onChange={e => handlePromptUpdate(e.target.value)}
-              className="w-full bg-slate-800/40 text-slate-200 border-2 border-slate-700/50 rounded-[2.5rem] p-10 text-sm focus:border-indigo-500 outline-none transition-all h-40 font-mono leading-relaxed shadow-inner"
-              placeholder="AI system prompt..."
-            />
-            <div className="flex items-center justify-between">
-              <div className="flex items-center gap-2">
-                 <div className={`w-2 h-2 rounded-full ${isCustomizedRef.current ? 'bg-amber-500' : 'bg-indigo-500 animate-pulse'}`}></div>
-                 <p className="text-slate-500 text-[10px] font-black uppercase tracking-widest">
-                   {isCustomizedRef.current 
-                     ? "Manual Neural Override Active" 
-                     : "Engine Auto-Synchronization Enabled"}
-                 </p>
-              </div>
-              {isCustomizedRef.current && (
-                <button 
-                  onClick={() => { isCustomizedRef.current = false; generateBasePrompt(); }}
-                  className="text-[9px] font-black uppercase tracking-widest text-indigo-400 hover:text-indigo-300 transition-colors border-b border-indigo-400/30"
-                >
-                  Reset to Core Logic
-                </button>
-              )}
-            </div>
-          </div>
         </div>
       </div>
 
@@ -304,24 +251,69 @@ export const MeetingContextConfig: React.FC<MeetingContextConfigProps> = ({ cont
           </div>
         </div>
       </div>
+
+      {/* Neural Core System Prompt with Manual Save Button */}
+      <div className="bg-slate-900 rounded-[3rem] p-12 shadow-2xl relative overflow-hidden group">
+        <div className="absolute top-0 right-0 p-10 opacity-10 group-hover:opacity-30 transition-opacity">
+          <ICONS.Brain className="text-indigo-400 w-24 h-24" />
+        </div>
+        <div className="relative z-10 space-y-6">
+          <div className="flex items-center justify-between">
+            <div className="flex items-center gap-4">
+              <div className="w-1.5 h-6 bg-indigo-500 rounded-full"></div>
+              <h3 className="text-indigo-400 text-[11px] font-black uppercase tracking-[0.4em]">Neural Core System Prompt</h3>
+            </div>
+            
+            <button 
+              onClick={savePrompt}
+              className={`flex items-center gap-2 px-6 py-2.5 rounded-xl text-[10px] font-black uppercase tracking-widest transition-all shadow-lg active:scale-95 ${isSaved ? 'bg-emerald-500 text-white' : 'bg-indigo-600 text-white hover:bg-indigo-700'}`}
+            >
+              {isSaved ? (
+                <>
+                  <svg xmlns="http://www.w3.org/2000/svg" className="w-4 h-4" viewBox="0 0 20 20" fill="currentColor">
+                    <path fillRule="evenodd" d="M16.707 5.293a1 1 0 010 1.414l-8 8a1 1 0 01-1.414 0l-4-4a1 1 0 011.414-1.414L8 12.586l7.293-7.293a1 1 0 011.414 0z" clipRule="evenodd" />
+                  </svg>
+                  Prompt Retained
+                </>
+              ) : (
+                <>
+                  <svg xmlns="http://www.w3.org/2000/svg" className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={3} d="M8 7H5a2 2 0 00-2 2v9a2 2 0 002 2h14a2 2 0 002-2V9a2 2 0 00-2-2h-3m-1 4l-3 3m0 0l-3-3m3 3V4" />
+                  </svg>
+                  Update & Save Prompt
+                </>
+              )}
+            </button>
+          </div>
+          <textarea
+            value={localPrompt}
+            onChange={e => handlePromptUpdate(e.target.value)}
+            className="w-full bg-slate-800/40 text-slate-200 border-2 border-slate-700/50 rounded-[2.5rem] p-10 text-sm focus:border-indigo-500 outline-none transition-all h-40 font-mono leading-relaxed shadow-inner"
+            placeholder="AI system prompt..."
+          />
+          <div className="flex items-center justify-between">
+            <div className="flex items-center gap-2">
+               <div className={`w-2 h-2 rounded-full ${isCustomizedRef.current ? 'bg-amber-500' : 'bg-indigo-500 animate-pulse'}`}></div>
+               <p className="text-slate-500 text-[10px] font-black uppercase tracking-widest">
+                 {isCustomizedRef.current 
+                   ? "Manual Neural Override Active" 
+                   : "Engine Auto-Synchronization Enabled"}
+               </p>
+            </div>
+            {isCustomizedRef.current && (
+              <button 
+                onClick={() => { isCustomizedRef.current = false; generateBasePrompt(); }}
+                className="text-[9px] font-black uppercase tracking-widest text-indigo-400 hover:text-indigo-300 transition-colors border-b border-indigo-400/30"
+              >
+                Reset to Core Logic
+              </button>
+            )}
+          </div>
+        </div>
+      </div>
     </div>
   );
 };
-
-const SliderInput = ({ label, min, max, step, value, onChange, desc }: { label: string; min: number; max: number; step: number; value: number; onChange: (v: number) => void; desc: string }) => (
-  <div className="space-y-3">
-    <div className="flex justify-between items-center">
-      <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest">{label}</label>
-      <span className="text-indigo-400 text-[10px] font-mono font-bold">{value}</span>
-    </div>
-    <input 
-      type="range" min={min} max={max} step={step} value={value} 
-      onChange={e => onChange(parseFloat(e.target.value))}
-      className="w-full accent-indigo-500 bg-slate-800 rounded-lg h-1.5 cursor-pointer"
-    />
-    <p className="text-[9px] text-slate-600 font-medium italic opacity-60 leading-tight">{desc}</p>
-  </div>
-);
 
 const Input = ({ label, value, onChange, placeholder, isLarge }: { label: string; value: string; onChange: (v: string) => void; placeholder: string, isLarge?: boolean }) => (
   <div className="space-y-2">

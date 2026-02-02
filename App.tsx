@@ -33,8 +33,6 @@ const App: React.FC = () => {
     persona: "Balanced",
     thinkingLevel: "Medium",
     temperature: 1.0,
-    topP: 0.95,
-    topK: 40,
     answerStyles: [
       "Executive Summary",
       "Data-Driven Insights",
@@ -184,7 +182,7 @@ const App: React.FC = () => {
             </div>
 
             {activeTab === 'context' && <MeetingContextConfig context={meetingContext} onContextChange={setMeetingContext} />}
-            {activeTab === 'strategy' && <AnalysisView result={analysis!} files={files} />}
+            {activeTab === 'strategy' && <AnalysisView result={analysis!} files={files} context={meetingContext} />}
             {activeTab === 'search' && <CognitiveSearch files={files} context={meetingContext} />}
             {activeTab === 'audio' && <AudioGenerator analysis={analysis!} />}
             {activeTab === 'practice' && <PracticeSession analysis={analysis!} />}

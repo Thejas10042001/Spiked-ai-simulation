@@ -1,266 +1,234 @@
 
-import React, { useState, useEffect, useMemo } from 'react';
-import { AnalysisResult, VideoStoryboard } from '../types';
+import React, { useState, useRef, useCallback } from 'react';
+import { AnalysisResult } from '../types';
 import { ICONS } from '../constants';
-import { startVideoGeneration, getVideoStatus, generateVideoStoryboard } from '../services/geminiService';
+import { GoogleGenAI, Modality, LiveServerMessage } from '@google/genai';
 
-interface VideoGeneratorProps {
+interface PracticeSessionProps {
   analysis: AnalysisResult;
 }
 
-export const VideoGenerator: React.FC<VideoGeneratorProps> = ({ analysis }) => {
-  const [hasApiKey, setHasApiKey] = useState(false);
-  const [isGenerating, setIsGenerating] = useState(false);
-  const [videoUrl, setVideoUrl] = useState<string | null>(null);
-  const [statusMessage, setStatusMessage] = useState("");
-  const [aspectRatio, setAspectRatio] = useState<'16:9' | '9:16'>('16:9');
-  const [error, setError] = useState<string | null>(null);
+export const PracticeSession: React.FC<PracticeSessionProps> = ({ analysis }) => {
+  const [isActive, setIsActive] = useState(false);
+  const [status, setStatus] = useState<'idle' | 'connecting' | 'active' | 'error'>('idle');
+  const [transcription, setTranscription] = useState<{ user: string; ai: string }[]>([]);
+  const [currentTranscription, setCurrentTranscription] = useState({ user: '', ai: '' });
   
-  const [storyboards, setStoryboards] = useState<VideoStoryboard[]>([]);
-  const [isIdeating, setIsIdeating] = useState(false);
-  const [selectedConcept, setSelectedConcept] = useState<VideoStoryboard | null>(null);
+  const audioContextRef = useRef<AudioContext | null>(null);
+  const nextStartTimeRef = useRef<number>(0);
+  const sourcesRef = useRef<Set<AudioBufferSourceNode>>(new Set());
+  const sessionRef = useRef<any>(null);
+  const streamRef = useRef<MediaStream | null>(null);
 
-  useEffect(() => {
-    const checkKey = async () => {
-      const selected = await (window as any).aistudio.hasSelectedApiKey();
-      setHasApiKey(selected);
-      if (selected) fetchStoryboards();
-    };
-    checkKey();
+  const encode = (bytes: Uint8Array) => {
+    let binary = '';
+    const len = bytes.byteLength;
+    for (let i = 0; i < len; i++) binary += String.fromCharCode(bytes[i]);
+    return btoa(binary);
+  };
+
+  const decode = (base64: string) => {
+    const binaryString = atob(base64);
+    const len = binaryString.length;
+    const bytes = new Uint8Array(len);
+    for (let i = 0; i < len; i++) bytes[i] = binaryString.charCodeAt(i);
+    return bytes;
+  };
+
+  const decodeAudioData = async (data: Uint8Array, ctx: AudioContext, sampleRate: number, numChannels: number): Promise<AudioBuffer> => {
+    const dataInt16 = new Int16Array(data.buffer);
+    const frameCount = dataInt16.length / numChannels;
+    const buffer = ctx.createBuffer(numChannels, frameCount, sampleRate);
+    for (let channel = 0; channel < numChannels; channel++) {
+      const channelData = buffer.getChannelData(channel);
+      for (let i = 0; i < frameCount; i++) {
+        channelData[i] = dataInt16[i * numChannels + channel] / 32768.0;
+      }
+    }
+    return buffer;
+  };
+
+  const stopPractice = useCallback(() => {
+    setIsActive(false);
+    setStatus('idle');
+    if (sessionRef.current) {
+      sessionRef.current.close();
+      sessionRef.current = null;
+    }
+    if (streamRef.current) {
+      streamRef.current.getTracks().forEach(track => track.stop());
+      streamRef.current = null;
+    }
+    sourcesRef.current.forEach(source => { try { source.stop(); } catch(e) {} });
+    sourcesRef.current.clear();
+    nextStartTimeRef.current = 0;
   }, []);
 
-  const fetchStoryboards = async () => {
-    setIsIdeating(true);
+  const startPractice = async () => {
+    setStatus('connecting');
     try {
-      const res = await generateVideoStoryboard(analysis);
-      setStoryboards(res);
+      const ai = new GoogleGenAI({ apiKey: process.env.API_KEY });
+      const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
+      streamRef.current = stream;
+
+      const inputCtx = new (window.AudioContext || (window as any).webkitAudioContext)({ sampleRate: 16000 });
+      const outputCtx = new (window.AudioContext || (window as any).webkitAudioContext)({ sampleRate: 24000 });
+      audioContextRef.current = outputCtx;
+
+      const sessionPromise = ai.live.connect({
+        model: 'gemini-2.5-flash-native-audio-preview-12-2025',
+        callbacks: {
+          onopen: () => {
+            setStatus('active');
+            setIsActive(true);
+            const source = inputCtx.createMediaStreamSource(stream);
+            const scriptProcessor = inputCtx.createScriptProcessor(4096, 1, 1);
+            scriptProcessor.onaudioprocess = (e) => {
+              const inputData = e.inputBuffer.getChannelData(0);
+              const l = inputData.length;
+              const int16 = new Int16Array(l);
+              for (let i = 0; i < l; i++) int16[i] = inputData[i] * 32768;
+              const pcmBlob = {
+                data: encode(new Uint8Array(int16.buffer)),
+                mimeType: 'audio/pcm;rate=16000',
+              };
+              sessionPromise.then(session => session.sendRealtimeInput({ media: pcmBlob }));
+            };
+            source.connect(scriptProcessor);
+            scriptProcessor.connect(inputCtx.destination);
+          },
+          onmessage: async (message: LiveServerMessage) => {
+            const base64Audio = message.serverContent?.modelTurn?.parts[0]?.inlineData?.data;
+            if (base64Audio) {
+              nextStartTimeRef.current = Math.max(nextStartTimeRef.current, outputCtx.currentTime);
+              const buffer = await decodeAudioData(decode(base64Audio), outputCtx, 24000, 1);
+              const source = outputCtx.createBufferSource();
+              source.buffer = buffer;
+              source.connect(outputCtx.destination);
+              source.onended = () => sourcesRef.current.delete(source);
+              source.start(nextStartTimeRef.current);
+              nextStartTimeRef.current += buffer.duration;
+              sourcesRef.current.add(source);
+            }
+
+            if (message.serverContent?.inputTranscription) {
+              setCurrentTranscription(prev => ({ ...prev, user: prev.user + message.serverContent!.inputTranscription!.text }));
+            }
+            if (message.serverContent?.outputTranscription) {
+              setCurrentTranscription(prev => ({ ...prev, ai: prev.ai + message.serverContent!.outputTranscription!.text }));
+            }
+            if (message.serverContent?.turnComplete) {
+              setTranscription(prev => [...prev, { user: currentTranscription.user, ai: currentTranscription.ai }]);
+              setCurrentTranscription({ user: '', ai: '' });
+            }
+
+            if (message.serverContent?.interrupted) {
+              sourcesRef.current.forEach(s => { try { s.stop(); } catch(e) {} });
+              sourcesRef.current.clear();
+              nextStartTimeRef.current = 0;
+            }
+          },
+          onerror: (e) => {
+            console.error("Live session error:", e);
+            setStatus('error');
+            stopPractice();
+          },
+          onclose: () => stopPractice(),
+        },
+        config: {
+          responseModalities: [Modality.AUDIO],
+          inputAudioTranscription: {},
+          outputAudioTranscription: {},
+          speechConfig: { voiceConfig: { prebuiltVoiceConfig: { voiceName: 'Charon' } } },
+          systemInstruction: `You are simulating a practice sales session. ACT AS THE BUYER defined in the following profile:
+          ROLE: ${analysis.snapshot.role}
+          DECISION STYLE: ${analysis.snapshot.decisionStyle}
+          RISK TOLERANCE: ${analysis.snapshot.riskTolerance}
+          TONE: ${analysis.snapshot.tone}
+          PRIORITIES: ${analysis.snapshot.priorities.map(p => p.text).join(', ')}
+          
+          Guidelines:
+          1. React naturally to the salesperson. 
+          2. Use objections like: ${analysis.objectionHandling.map(o => o.objection).join(', ')}.
+          3. Challenge their points based on your role's fears and priorities.
+          4. Keep responses brief to keep the flow alive.`
+        },
+      });
+      sessionRef.current = await sessionPromise;
     } catch (e) {
-      setError("Failed to conceptualize video strategy.");
-    } finally {
-      setIsIdeating(false);
+      console.error("Connection failed:", e);
+      setStatus('error');
     }
   };
-
-  const handleOpenKeySelection = async () => {
-    await (window as any).aistudio.openSelectKey();
-    setHasApiKey(true); 
-    fetchStoryboards();
-  };
-
-  const generatePitchVideo = async () => {
-    if (!selectedConcept) return;
-    setIsGenerating(true);
-    setError(null);
-    setStatusMessage("Conceptualizing visual metaphor...");
-
-    const messages = [
-      "Directing scene transitions...",
-      "Synthesizing persona-aligned visuals...",
-      "Rendering cinematic strategic frames...",
-      "Finalizing high-fidelity explainer...",
-      "Grounding visual content in source data..."
-    ];
-
-    let msgIdx = 0;
-    const interval = setInterval(() => {
-      setStatusMessage(messages[msgIdx % messages.length]);
-      msgIdx++;
-    }, 15000);
-
-    try {
-      let operation = await startVideoGeneration(selectedConcept.veoPrompt, aspectRatio);
-      
-      while (!operation.done) {
-        await new Promise(resolve => setTimeout(resolve, 10000));
-        operation = await getVideoStatus(operation);
-      }
-
-      const downloadLink = operation.response?.generatedVideos?.[0]?.video?.uri;
-      const response = await fetch(`${downloadLink}&key=${process.env.API_KEY}`);
-      const blob = await response.blob();
-      const url = URL.createObjectURL(blob);
-      setVideoUrl(url);
-    } catch (err: any) {
-      console.error(err);
-      if (err.message?.includes("entity was not found")) {
-        setHasApiKey(false);
-        setError("Selected API key project not found. Please re-select a paid project.");
-      } else {
-        setError("Video generation failed. Please try again.");
-      }
-    } finally {
-      clearInterval(interval);
-      setIsGenerating(false);
-      setStatusMessage("");
-    }
-  };
-
-  if (!hasApiKey) {
-    return (
-      <div className="bg-slate-900 text-white rounded-[2.5rem] p-12 text-center space-y-6 shadow-2xl border border-slate-800">
-        <div className="w-20 h-20 bg-indigo-600 rounded-3xl flex items-center justify-center mx-auto shadow-indigo-500/20 shadow-lg rotate-3">
-          <ICONS.Sparkles />
-        </div>
-        <h3 className="text-3xl font-black tracking-tight">Activate Visual Intelligence</h3>
-        <p className="text-slate-400 max-w-lg mx-auto leading-relaxed">
-          High-fidelity video generation requires access to a paid Google Cloud project via the Gemini API. 
-          Please select a project with active billing to continue.
-        </p>
-        <div className="flex flex-col items-center gap-4">
-          <button 
-            onClick={handleOpenKeySelection}
-            className="px-8 py-4 bg-white text-slate-900 font-black rounded-full hover:bg-indigo-50 transition-all transform hover:scale-105 active:scale-95"
-          >
-            Select Paid API Key
-          </button>
-          <a 
-            href="https://ai.google.dev/gemini-api/docs/billing" 
-            target="_blank" 
-            className="text-xs text-indigo-400 font-bold uppercase tracking-widest hover:text-indigo-300 transition-colors"
-          >
-            Review Billing Documentation
-          </a>
-        </div>
-        {error && <p className="text-rose-400 text-xs font-bold bg-rose-950/30 py-2 px-4 rounded-full border border-rose-900/50">{error}</p>}
-      </div>
-    );
-  }
 
   return (
-    <div className="bg-white border border-slate-200 rounded-[2.5rem] p-10 shadow-xl overflow-hidden relative min-h-[600px]">
+    <div className="bg-white border border-slate-200 rounded-[2.5rem] p-10 shadow-xl overflow-hidden relative min-h-[600px] flex flex-col">
       <div className="flex flex-col md:flex-row items-center justify-between gap-6 mb-10">
         <div className="flex items-center gap-3">
-          <div className="p-3 bg-indigo-600 text-white rounded-2xl shadow-lg shadow-indigo-100">
-            <ICONS.Play />
-          </div>
+          <div className="p-3 bg-rose-600 text-white rounded-2xl shadow-lg"><ICONS.Chat /></div>
           <div>
-            <h3 className="text-2xl font-bold text-slate-800 tracking-tight">AI Explainer Studio</h3>
-            <p className="text-xs text-slate-400 font-bold uppercase tracking-widest">Grounded Sales Visuals</p>
+            <h3 className="text-2xl font-bold text-slate-800 tracking-tight">Live Practise Simulation</h3>
+            <p className="text-xs text-slate-400 font-bold uppercase tracking-widest">Real-time Conversational Roleplay</p>
           </div>
         </div>
-
-        {!videoUrl && !isGenerating && (
-          <div className="flex items-center gap-2 p-1 bg-slate-100 rounded-full border border-slate-200">
-            <button 
-              onClick={() => setAspectRatio('16:9')}
-              className={`px-4 py-1.5 rounded-full text-[10px] font-black uppercase tracking-widest transition-all ${aspectRatio === '16:9' ? 'bg-white text-indigo-600 shadow-sm' : 'text-slate-500 hover:text-slate-800'}`}
-            >
-              16:9 Desktop
-            </button>
-            <button 
-              onClick={() => setAspectRatio('9:16')}
-              className={`px-4 py-1.5 rounded-full text-[10px] font-black uppercase tracking-widest transition-all ${aspectRatio === '9:16' ? 'bg-white text-indigo-600 shadow-sm' : 'text-slate-500 hover:text-slate-800'}`}
-            >
-              9:16 Mobile
-            </button>
+        {isActive && (
+          <div className="flex items-center gap-4">
+            <div className="flex items-center gap-2 px-4 py-2 bg-emerald-50 border border-emerald-100 rounded-full">
+              <span className="w-2 h-2 bg-emerald-500 rounded-full animate-ping"></span>
+              <span className="text-[10px] font-black text-emerald-600 uppercase tracking-widest">Live</span>
+            </div>
+            <button onClick={stopPractice} className="px-6 py-2 bg-rose-600 text-white text-[10px] font-black uppercase tracking-widest rounded-full hover:bg-rose-700 transition-all">End Simulation</button>
           </div>
         )}
       </div>
 
-      {isIdeating ? (
-        <div className="py-20 text-center space-y-4">
-           <div className="w-12 h-12 border-2 border-indigo-100 border-t-indigo-600 rounded-full animate-spin mx-auto"></div>
-           <p className="text-slate-400 text-xs font-black uppercase tracking-widest">Crafting Storyboards...</p>
+      {!isActive ? (
+        <div className="flex-1 flex flex-col items-center justify-center text-center space-y-8 max-w-2xl mx-auto py-10">
+          <div className="w-24 h-24 bg-indigo-50 rounded-[2rem] flex items-center justify-center text-indigo-600"><ICONS.Brain /></div>
+          <div className="space-y-4">
+            <h4 className="text-2xl font-black text-slate-800">Roleplay with the {analysis.snapshot.role}</h4>
+            <p className="text-slate-500 leading-relaxed">Prepare for the real deal. Our AI will assume the psychological profile inferred from your documents. Speak into your microphone and handle the heat.</p>
+          </div>
+          <button onClick={startPractice} disabled={status === 'connecting'} className="inline-flex items-center gap-4 px-12 py-6 bg-indigo-600 text-white rounded-full font-black text-xl shadow-2xl hover:bg-indigo-700 hover:scale-105 active:scale-95 transition-all">
+            {status === 'connecting' ? 'Connecting Neural Buyer...' : <><ICONS.Play /> Start Simulation</>}
+          </button>
+          {status === 'error' && <p className="text-rose-500 text-sm font-bold">Connection failed. Ensure microphone access and valid key.</p>}
         </div>
-      ) : !videoUrl && !isGenerating ? (
-        <div className="space-y-10 animate-in fade-in duration-700">
-          <div className="max-w-2xl">
-            <h4 className="text-xl font-bold text-slate-800 mb-2">Step 1: Select Your Visual Strategy</h4>
-            <p className="text-sm text-slate-500 leading-relaxed">
-              We've conceptualized three distinct cinematic approaches based on your analysis of the <strong>{analysis.snapshot.role}</strong>. Choose one to trigger neural rendering.
-            </p>
-          </div>
-
-          <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
-            {storyboards.map((story) => (
-              <button
-                key={story.id}
-                onClick={() => setSelectedConcept(story)}
-                className={`p-8 rounded-[2rem] border-2 text-left transition-all relative overflow-hidden group ${selectedConcept?.id === story.id ? 'bg-indigo-600 border-indigo-600 shadow-2xl scale-[1.02]' : 'bg-slate-50 border-slate-100 hover:border-indigo-300 shadow-sm'}`}
-              >
-                <div className={`text-[9px] font-black uppercase tracking-widest mb-3 ${selectedConcept?.id === story.id ? 'text-indigo-200' : 'text-indigo-500'}`}>{story.angle} Strategy</div>
-                <p className={`font-black text-lg mb-4 tracking-tight leading-tight ${selectedConcept?.id === story.id ? 'text-white' : 'text-slate-800'}`}>{story.title}</p>
-                <p className={`text-xs leading-relaxed ${selectedConcept?.id === story.id ? 'text-indigo-100' : 'text-slate-500'}`}>{story.description}</p>
-                {selectedConcept?.id === story.id && (
-                  <div className="absolute top-4 right-4 text-white animate-bounce"><ICONS.Trophy /></div>
-                )}
-              </button>
-            ))}
-          </div>
-
-          {selectedConcept && (
-            <div className="flex flex-col items-center pt-8 border-t border-slate-100">
-               <button 
-                onClick={generatePitchVideo}
-                className="inline-flex items-center gap-3 px-12 py-6 bg-indigo-600 text-white rounded-full font-black text-xl hover:bg-indigo-700 transition-all hover:scale-105 active:scale-95 shadow-2xl shadow-indigo-100"
-              >
-                <ICONS.Play />
-                Render Concept: {selectedConcept.title}
-              </button>
-              <p className="text-[10px] text-slate-400 font-black uppercase tracking-widest mt-4">Estimated Time: 60-90 Seconds</p>
+      ) : (
+        <div className="flex-1 grid grid-cols-1 lg:grid-cols-3 gap-8 overflow-hidden">
+          <div className="lg:col-span-2 bg-slate-900 rounded-[2.5rem] p-10 flex flex-col items-center justify-center relative shadow-inner overflow-hidden">
+            <div className="relative w-64 h-64 mb-10 flex items-center justify-center">
+               <div className="absolute inset-0 bg-indigo-500/20 rounded-full animate-pulse"></div>
+               <div className="w-32 h-32 bg-indigo-600 rounded-full flex items-center justify-center text-white scale-150 shadow-2xl shadow-indigo-500/50"><ICONS.Brain /></div>
             </div>
-          )}
-        </div>
-      ) : isGenerating ? (
-        <div className="bg-slate-50 border border-slate-100 rounded-[2rem] py-24 flex flex-col items-center justify-center space-y-6">
-          <div className="relative">
-            <div className="w-24 h-24 border-4 border-indigo-100 border-t-indigo-600 rounded-full animate-spin"></div>
-            <div className="absolute inset-0 flex items-center justify-center text-indigo-600 animate-pulse">
-               <ICONS.Brain />
+            <div className="text-center space-y-2">
+               <h5 className="text-white text-xl font-bold">{analysis.snapshot.role}</h5>
+               <p className="text-slate-400 text-sm italic">"I'm listening. Show me the value."</p>
+            </div>
+            <div className="absolute bottom-8 inset-x-8 h-24 overflow-y-auto no-scrollbar flex flex-col justify-end">
+              {currentTranscription.user && <p className="text-right text-indigo-300 text-xs italic mb-2">You: {currentTranscription.user}</p>}
+              {currentTranscription.ai && <p className="text-left text-emerald-300 text-xs font-bold">AI: {currentTranscription.ai}</p>}
             </div>
           </div>
-          <div className="text-center">
-            <p className="text-xl font-bold text-slate-800 animate-pulse">{statusMessage}</p>
-            <p className="text-[10px] text-slate-400 font-black uppercase tracking-[0.2em] mt-2">Veo 3.1 Neural Engine Engaged</p>
-          </div>
-          {/* Animated Render Bar */}
-          <div className="w-64 h-1 bg-slate-200 rounded-full overflow-hidden mt-4">
-             <div className="h-full bg-indigo-500 animate-[progress_1.5s_infinite]"></div>
-          </div>
-        </div>
-      ) : videoUrl && (
-        <div className="space-y-6 animate-in fade-in zoom-in duration-700">
-          <div className="aspect-video bg-black rounded-[2.5rem] overflow-hidden shadow-2xl relative group">
-            <video src={videoUrl} controls className="w-full h-full object-contain" />
-            <div className="absolute bottom-6 left-6 p-4 bg-black/40 backdrop-blur-md border border-white/20 rounded-2xl opacity-0 group-hover:opacity-100 transition-opacity">
-               <p className="text-white text-xs font-bold">{selectedConcept?.title}</p>
-               <p className="text-white/60 text-[10px] uppercase tracking-widest">{selectedConcept?.angle} Angle</p>
-            </div>
-          </div>
-          <div className="flex justify-between items-center px-4">
-            <div className="flex items-center gap-4">
-              <div className="flex items-center gap-2">
-                <span className="w-2 h-2 bg-indigo-500 rounded-full animate-ping"></span>
-                <p className="text-xs text-slate-500 font-bold uppercase tracking-widest">Neural Render Complete</p>
-              </div>
-              <div className="h-4 w-px bg-slate-200"></div>
-              <p className="text-[10px] text-slate-400 italic">Inspired by {(analysis.snapshot.priorities || [])[0]?.text || "strategic analysis"}</p>
-            </div>
-            <div className="flex gap-4">
-              <button 
-                onClick={() => {setVideoUrl(null); setSelectedConcept(null);}}
-                className="px-8 py-3 bg-slate-100 text-slate-600 text-[10px] font-black uppercase tracking-widest rounded-full hover:bg-slate-200 transition-colors"
-              >
-                New Concept
-              </button>
-              <a 
-                href={videoUrl} 
-                download="sales-pitch-explainer.mp4"
-                className="px-8 py-3 bg-indigo-600 text-white text-[10px] font-black uppercase tracking-widest rounded-full hover:bg-indigo-700 transition-all shadow-lg shadow-indigo-200"
-              >
-                Download MP4
-              </a>
+          <div className="bg-slate-50 rounded-[2.5rem] p-6 flex flex-col border border-slate-100 overflow-hidden">
+            <h6 className="text-[10px] font-black uppercase tracking-[0.3em] text-slate-400 mb-4">Conversation History</h6>
+            <div className="flex-1 overflow-y-auto pr-2 space-y-4 custom-scrollbar">
+              {transcription.map((turn, i) => (
+                <div key={i} className="space-y-1 animate-in slide-in-from-bottom-2">
+                  <p className="text-[9px] font-bold text-slate-400 uppercase">You</p>
+                  <p className="text-xs text-slate-700 bg-white p-2 rounded-lg border border-slate-100">"{turn.user}"</p>
+                  <p className="text-[9px] font-bold text-indigo-500 uppercase mt-2">Buyer</p>
+                  <p className="text-xs text-indigo-900 bg-indigo-50 p-2 rounded-lg border border-indigo-100 italic">"{turn.ai}"</p>
+                </div>
+              ))}
             </div>
           </div>
         </div>
       )}
-      
       <style>{`
-        @keyframes progress {
-          0% { width: 0%; transform: translateX(-100%); }
-          50% { width: 100%; transform: translateX(0%); }
-          100% { width: 0%; transform: translateX(100%); }
-        }
+        .no-scrollbar::-webkit-scrollbar { display: none; }
+        .custom-scrollbar::-webkit-scrollbar { width: 4px; }
+        .custom-scrollbar::-webkit-scrollbar-thumb { background: #cbd5e1; border-radius: 10px; }
       `}</style>
     </div>
   );
